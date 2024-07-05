@@ -513,7 +513,7 @@ export class Contractors {
                     "userType": "CONTRACTOR",
                     "username": `${_values.username.value}@${currentCustomer.name.toLowerCase().replace(/\s+/g, '')}.com`,
                 });
-                const existUsername = await getVerifyUsername(`${_values.username.value}@${currentUserInfo.customer.name.toLowerCase().replace(/\s+/g, '')}.com`);
+                const existUsername = await getVerifyUsername(`${_values.username.value}@${currentCustomer.name.toLowerCase().replace(/\s+/g, '')}.com`);
                 /*const existEmail = await getVerifyEmail(_values.email.value);
                 if(existEmail == true){
                     alert("¡Correo electrónico ya existe!");
