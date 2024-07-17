@@ -560,6 +560,7 @@ export class Locations {
                     <select class="input_time input_time-start" id="entity-distance">
                         <option value="5" selected>5</option>
                         <option value="10">10</option>
+                        <option value="20">20</option>
                         <option value="30">30</option>
                         <option value="40">40</option>
                         <option value="50">50</option>
