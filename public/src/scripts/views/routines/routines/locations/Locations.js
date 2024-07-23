@@ -1006,7 +1006,7 @@ const agregarCero = (valor) => {
 const createRoutines = async (mode, routineId, scheduleId) => {
   const insertTimes = (ubications) => {
     const schedules = calculoTimes(ubications);
-    console.log(schedules);
+    //console.log(schedules);
     schedules.forEach(async (schedule) => {
       const raw = JSON.stringify({ 
         "business": {
