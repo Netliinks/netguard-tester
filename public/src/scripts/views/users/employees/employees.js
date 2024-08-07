@@ -527,7 +527,7 @@ export class Employees {
                 if(existEmail == true){
                     alert("¡Correo electrónico ya existe!");
                 }else */
-                const existUsername = await getVerifyUsername(`${_values.username.value}@${currentUserInfo.customer.name.toLowerCase().replace(/\s+/g, '')}.com`);
+                const existUsername = await getVerifyUsername(`${_values.username.value}@${currentCustomer.name.toLowerCase().replace(/\s+/g, '')}.com`);
                 if (existUsername != "none") {
                     alert("¡Usuario ya existe, es tipo " + existUsername + "!");
                 }

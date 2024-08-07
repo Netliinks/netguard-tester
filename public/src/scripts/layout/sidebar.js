@@ -242,64 +242,81 @@ export class Sidebar {
       </div>
     </div>
   `;
+  clearTimeout(Config.timeOut);
   this.getSidebarItems();
   this.renders();
 }
 renders() {
     document.getElementById('render-dashboard')?.addEventListener('click', () => {
+      clearTimeout(Config.timeOut);
       new Dashboard().render();
     });
     document.getElementById('render-customers')?.addEventListener('click', () => {
+      clearTimeout(Config.timeOut);
       new Customers().render(Config.offset, Config.currentPage, "");
     });
     document.getElementById('render-guards')?.addEventListener('click', () => {
+      clearTimeout(Config.timeOut);
         new Guards().render(Config.offset, Config.currentPage, "");
     });
     document.getElementById('render-clients')?.addEventListener('click', () => {
+      clearTimeout(Config.timeOut);
         new Clients().render(Config.offset, Config.currentPage, "");
     });
     document.getElementById('render-employees')?.addEventListener('click', () => {
+      clearTimeout(Config.timeOut);
         new Employees().render(Config.offset, Config.currentPage, "");
     });
     document.getElementById('render-contractors')?.addEventListener('click', () => {
+      clearTimeout(Config.timeOut);
         new Contractors().render(Config.offset, Config.currentPage, "");
     });
     document.getElementById('render-blacklist')?.addEventListener('click', () => {
+      clearTimeout(Config.timeOut);
         new Blacklist().render(Config.offset, Config.currentPage, "");
     });
     // render notes
     document.getElementById('render-notes')?.addEventListener('click', () => {
+      clearTimeout(Config.timeOut);
         new Notes().render(Config.offset, Config.currentPage, "");
     });
     // render visits
     document.getElementById('render-visits')?.addEventListener('click', () => {
+      clearTimeout(Config.timeOut);
         new Visits().render(Config.offset, Config.currentPage, "");
     });
     document.getElementById('render-binnacle')?.addEventListener('click', () => {
+      clearTimeout(Config.timeOut);
       new Binnacle().render(Config.offset, Config.currentPage, "");
   });
     // render AssistControl
     document.getElementById('render-assistControl')?.addEventListener('click', () => {
+      clearTimeout(Config.timeOut);
       new AssistControl().render(Config.offset, Config.currentPage, "");
     });
     // render AssistGestion
     document.getElementById('render-assistGestion')?.addEventListener('click', () => {
+      clearTimeout(Config.timeOut);
       new AssistGestion().render("", currentDateTime().date);
   });
     // render AssistControl
     document.getElementById('render-events')?.addEventListener('click', () => {
+      clearTimeout(Config.timeOut);
         new Events().render(Config.offset, Config.currentPage, "");
     });
     // render AssistControl
     document.getElementById('render-vehiculars')?.addEventListener('click', () => {
+      clearTimeout(Config.timeOut);
       new Vehiculars().render(Config.offset, Config.currentPage, "");
     });
     // render Deparments
     document.getElementById('render-deparments')?.addEventListener('click', () => {
+      clearTimeout(Config.timeOut);
         new Departments().render(Config.offset, Config.currentPage, "");
     });
     // render Superusers
     document.getElementById('render-superusers')?.addEventListener('click', () => {
+      clearTimeout(Config.timeOut);
         new SuperUsers().render(Config.offset, Config.currentPage, "");
     });
     
@@ -308,24 +325,29 @@ renders() {
       new TasksTime().render();
     });*/
     document.getElementById('render-fixed')?.addEventListener('click', () => {
+      clearTimeout(Config.timeOut);
       new Fixed().render(Config.offset, Config.currentPage, "");
     });
      // render Tasks Sporadic
     document.getElementById('render-sporadic')?.addEventListener('click', () => {
+      clearTimeout(Config.timeOut);
       new Sporadic().render(Config.offset, Config.currentPage, "");
     });
 
     // render Procedures
     document.getElementById('render-procedures')?.addEventListener('click', () => {
+      clearTimeout(Config.timeOut);
       new Procedures().render(Config.offset, Config.currentPage, "");
     });
 
     document.getElementById('render-routineConfiguration')?.addEventListener('click', () => {
+      clearTimeout(Config.timeOut);
       new Routines().render(Config.offset, Config.currentPage, "");
     });
 
     document.getElementById('render-routineDetails')?.addEventListener('click', () => {
-      new RoutineRegisters().render(Config.offset, Config.currentPage, "");
+      clearTimeout(Config.timeOut);
+      new RoutineRegisters().render(Config.offset, Config.currentPage, "", false);
     });
   }
 }

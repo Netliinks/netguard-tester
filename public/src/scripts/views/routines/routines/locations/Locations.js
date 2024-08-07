@@ -314,6 +314,11 @@ export class Locations {
                   <select class="input_time input_time-start" id="entity-distance">
                       <option value="5" selected>5</option>
                       <option value="10">10</option>
+                      <option value="20">20</option>
+                      <option value="30">30</option>
+                      <option value="40">40</option>
+                      <option value="50">50</option>
+                      <option value="60">60</option>
                   </select>
                 </div>
 
@@ -361,6 +366,16 @@ export class Locations {
                 //console.log(latitud)
                 const longitud = parseFloat(coords[1].trim());
                 //console.log(longitud)
+                const timeIni = inputsCollection.scheduleTime.value.split(':');
+                const hourIni = parseInt(timeIni[0].trim());
+                //console.log(hourIni)
+                const minIni = parseInt(timeIni[1].trim());
+                //console.log(minIni)
+                const timeEnd = inputsCollection.scheduleTimeEnd.value.split(':');
+                const hourEnd = parseInt(timeEnd[0].trim());
+                //console.log(hourEnd)
+                const minEnd = parseInt(timeEnd[1].trim());
+                //console.log(minEnd)
                 const raw = JSON.stringify({
                     "name": `${inputsCollection.name.value}`,
                     "cords": `${inputsCollection.cords.value}`,
@@ -390,6 +405,8 @@ export class Locations {
                   alert("Distancia inválida");
                 }else if(routine.id == '' || routine.id == null || routine.id == undefined){
                   alert("No hay rutina");
+                }else if(hourIni == hourEnd && minIni > minEnd){
+                  alert("Minutos iniciales no pueden ser mayores a las del final en horas iguales.");
                 }else{
                   registerEntity(raw, 'RoutineSchedule');
                   setTimeout(() => {
@@ -543,6 +560,11 @@ export class Locations {
                     <select class="input_time input_time-start" id="entity-distance">
                         <option value="5" selected>5</option>
                         <option value="10">10</option>
+                        <option value="20">20</option>
+                        <option value="30">30</option>
+                        <option value="40">40</option>
+                        <option value="50">50</option>
+                        <option value="60">60</option>
                     </select>
                   </div>
 
@@ -624,6 +646,16 @@ export class Locations {
             //console.log(latitud)
             const longitud = parseFloat(coords[1].trim());
             //console.log(longitud)
+            const timeIni = $value.scheduleTime.value.split(':');
+            const hourIni = parseInt(timeIni[0].trim());
+            //console.log(hourIni)
+            const minIni = parseInt(timeIni[1].trim());
+            //console.log(minIni)
+            const timeEnd = $value.scheduleTimeEnd.value.split(':');
+            const hourEnd = parseInt(timeEnd[0].trim());
+            //console.log(hourEnd)
+            const minEnd = parseInt(timeEnd[1].trim());
+            //console.log(minEnd)
             let raw = JSON.stringify({
                 // @ts-ignore
                 "name": `${$value.name.value}`,
@@ -643,6 +675,8 @@ export class Locations {
               alert("No se ha seleccionado una ubicación");
             }else if($value.distance.value == "" || $value.distance.value == undefined || $value.distance.value < 0){
               alert("Distancia inválida");
+            }else if(hourIni == hourEnd && minIni > minEnd){
+              alert("Minutos iniciales no pueden ser mayores a las del final en horas iguales.");
             }else{
               update(raw);
             }
@@ -973,7 +1007,7 @@ const agregarCero = (valor) => {
 const createRoutines = async (mode, routineId, scheduleId) => {
   const insertTimes = (ubications) => {
     const schedules = calculoTimes(ubications);
-    console.log(schedules);
+    //console.log(schedules);
     schedules.forEach(async (schedule) => {
       const raw = JSON.stringify({ 
         "business": {

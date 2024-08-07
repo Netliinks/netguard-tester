@@ -8,6 +8,7 @@ export const UIContentLayout = `
         <div class="datatable_header">
             <div class="datatable_title"><h1 id="view-title"></h1></div>
             <div class="datatable_tools" id="datatable-tools">
+                <label><input type="checkbox" class="checkbox" id="entity-check"> Todas las empresas  |</label>
                 <input type="search" class="search_input" placeholder="Buscar" id="search">
                 <button
                     class="datatable_button add_user"
@@ -20,6 +21,10 @@ export const UIContentLayout = `
 
         <table class="datatable_content">
         <thead><tr>
+            <th><span data-type="customer">
+            Empresa <i class="fa-regular fa-filter"></i>
+            </span></th>
+
             <th><span data-type="routine">
             Rutina <i class="fa-regular fa-filter"></i>
             </span></th>

@@ -358,6 +358,16 @@ export class Events {
                                     "value": `Nota`
                                 },
                                 {
+                                    "property": "notificationType.name",
+                                    "operator": "<>",
+                                    "value": `Consigna`
+                                },
+                                {
+                                    "property": "notificationType.name",
+                                    "operator": "<>",
+                                    "value": `Rutina`
+                                },
+                                {
                                     "property": "creationDate",
                                     "operator": ">=",
                                     "value": `${_values.start.value}`
