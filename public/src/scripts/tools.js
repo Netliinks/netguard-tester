@@ -171,6 +171,11 @@ export const drawTagsIntoTables = () => {
             text === "PENDIENTE") {
             tag.classList.add("tag_yellow");
         }
+        else if(text === "No cumplido"||
+            text === "no cumplido" ||
+            text === "NO CUMPLIDO"){
+            tag.classList.add("tag_red")
+        }
         else {
             tag.classList.add('tag_gray');
         }

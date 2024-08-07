@@ -789,7 +789,8 @@ export class Locations {
                 const deleteButton = document.getElementById('delete');
                 const cancelButton = document.getElementById('cancel');
                 const dialogContent = document.getElementById('dialog-content');
-                deleteButton.onclick = () => {
+                deleteButton.onclick = async () => {
+                    createRoutines('DLT', null, entityId);
                     deleteEntity('RoutineSchedule', entityId)
                         .then(res => new Locations().render(infoPage.offset, infoPage.currentPage, infoPage.search, routine.id));
                     new CloseDialog().x(dialogContent);
@@ -1089,6 +1090,23 @@ const createRoutines = async (mode, routineId, scheduleId) => {
     if(times != undefined && times.length != 0){
       deleteTimes(times);
       insertTimes(data);
+    }
+  }else if(mode == 'DLT'){
+    let raw = JSON.stringify({
+      "filter": {
+          "conditions": [
+              {
+                "property": "routineSchedule.id",
+                "operator": "=",
+                "value": `${scheduleId}`
+              },
+          ],
+      },
+      sort: "-createdDate",
+    });
+    let times = await getFilterEntityData("RoutineTime", raw);
+    if(times != undefined && times.length != 0){
+      deleteTimes(times);
     }
   }
 };

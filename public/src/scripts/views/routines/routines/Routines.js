@@ -439,6 +439,22 @@ export class Routines {
                   const locations = await getDetails('routine.id', entityId, 'RoutineSchedule');
                   if(locations.length != 0 && locations != undefined){
                     for(let i=0; i<locations.length; i++){
+                      let raw = JSON.stringify({
+                        "filter": {
+                            "conditions": [
+                                {
+                                  "property": "routineSchedule.id",
+                                  "operator": "=",
+                                  "value": `${locations[i].id}`
+                                },
+                            ],
+                        },
+                        sort: "-createdDate",
+                      });
+                      let times = await getFilterEntityData("RoutineTime", raw);
+                      for(let i=0; i<times.length; i++){
+                        deleteEntity('RoutineTime', times[i].id);
+                      }
                       deleteEntity('RoutineSchedule', locations[i].id);
                     }
                   }
