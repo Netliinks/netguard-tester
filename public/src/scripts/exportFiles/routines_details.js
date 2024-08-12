@@ -20,11 +20,11 @@ export const exportRoutineDetailPdf = (ar, start, end) => {
     doc.setFillColor(210, 210, 210);
     doc.rect(5, 35, 200, 10, 'F');
     doc.text(10, 40, "Fecha");
-    doc.text(30, 40, "Hora");
-    doc.text(50, 40, "Rutina");
-    doc.text(80, 40, "Ubicación");
-    doc.text(110, 40, "Usuario");
-    doc.text(150, 40, "Observación");
+    doc.text(40, 40, "Estado");
+    doc.text(60, 40, "Rutina");
+    doc.text(90, 40, "Ubicación");
+    doc.text(120, 40, "Usuario");
+    doc.text(160, 40, "Observación");
     doc.line(5, 45, 205, 45);
     let row = 50;
     let pagina = 1;
@@ -39,34 +39,39 @@ export const exportRoutineDetailPdf = (ar, start, end) => {
             usuario: 0,
             observacion: 0
         }
-        doc.setFontSize(9);
+        doc.setFontSize(8);
         doc.setFont(undefined, 'normal');
         doc.setTextColor(0, 0, 0);
         doc.text(10, row, `${register.fecha}`);
-        doc.text(30, row, `${register.hora}`);
+        doc.text(25, row, `${register.hora}`);
+        if(register.estado == "No cumplido"){
+            doc.setTextColor(255, 0, 0);
+        }
+        doc.text(40, row, `${register.estado}`);
 
-        var lMargin = 50; //left margin in mm
+        doc.setTextColor(0, 0, 0);
+        var lMargin = 60; //left margin in mm
         var rMargin = 5; //right margin in mm
-        var pdfInMM = 80; //210;  // width of A4 in mm
+        var pdfInMM = 90; //210;  // width of A4 in mm
         var paragraph = doc.splitTextToSize(register.rutina, (pdfInMM - lMargin - rMargin));
         doc.text(lMargin, row, paragraph);
         rowAtt.rutina = calculateRow(register.rutina.length,"rutina");
 
-        lMargin = 80; //left margin in mm
+        lMargin = 90; //left margin in mm
         rMargin = 5; //right margin in mm
-        pdfInMM = 110; //210;  // width of A4 in mm
+        pdfInMM = 120; //210;  // width of A4 in mm
         paragraph = doc.splitTextToSize(register.ubicacion, (pdfInMM - lMargin - rMargin));
         doc.text(lMargin, row, paragraph);
         rowAtt.ubicacion = calculateRow(register.ubicacion.length,"ubicacion");
 
-        var lMargin = 110; //left margin in mm
+        var lMargin = 120; //left margin in mm
         var rMargin = 5; //right margin in mm
-        var pdfInMM = 150; //210;  // width of A4 in mm
+        var pdfInMM = 160; //210;  // width of A4 in mm
         var paragraph = doc.splitTextToSize(register.usuario, (pdfInMM - lMargin - rMargin));
         doc.text(lMargin, row, paragraph);
         rowAtt.usuario = calculateRow(register.usuario.length,"usuario");
 
-        lMargin = 150; //left margin in mm
+        lMargin = 160; //left margin in mm
         rMargin = 5; //right margin in mm
         pdfInMM = 210; //210;  // width of A4 in mm
         paragraph = doc.splitTextToSize(register.observacion, (pdfInMM - lMargin - rMargin));
@@ -94,11 +99,11 @@ export const exportRoutineDetailPdf = (ar, start, end) => {
             doc.setFillColor(210, 210, 210);
             doc.rect(5, 15, 200, 10, 'F');
             doc.text(10, 20, "Fecha");
-            doc.text(30, 20, "Hora");
-            doc.text(50, 20, "Rutina");
-            doc.text(80, 20, "Ubicación");
-            doc.text(110, 20, "Usuario");
-            doc.text(150, 20, "Observación");
+            doc.text(40, 20, "Estado");
+            doc.text(60, 20, "Rutina");
+            doc.text(90, 20, "Ubicación");
+            doc.text(120, 20, "Usuario");
+            doc.text(160, 20, "Observación");
             doc.line(5, 25, 205, 25);
             doc.setTextColor(0, 0, 128);
             doc.text(10, 290, `Página ${pagina}`);
@@ -120,10 +125,13 @@ export const exportRoutineDetailCsv = (ar, start, end) => {
             let obj = {
                 "Fecha": `${register.creationDate}`,
                 "Hora": `${register.creationTime}`,
+                "Estado": `${register?.routineState?.name ?? ''}`,
                 "Rutina": `${register?.routine?.name.split("\n").join(". ").replace(/[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2580-\u27BF]|\uD83E[\uDD10-\uDDFF]/g, '').trim()}`,
                 "Ubicación": `${register?.routineSchedule?.name.split("\n").join(". ").replace(/[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2580-\u27BF]|\uD83E[\uDD10-\uDDFF]/g, '').trim()}`,
                 "Usuario": `${register.user?.firstName ?? ''} ${register.user?.lastName ?? ''}`,
                 "Coordenadas (Lat, Long)": `${register?.cords ?? ''}`,
+                "Fecha desde:": `${register?.targetDate ?? ''} ${register?.targetTime ?? ''}`,
+                "Fecha hasta:": `${register?.targetDate2 ?? ''} ${register?.targetTime2 ?? ''}`,
                 "Observación": `${register?.observation?.split("\n").join(". ").replace(/[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2580-\u27BF]|\uD83E[\uDD10-\uDDFF]/g, '').trim() ?? ''}`,
             };
             rows.push(obj);
@@ -140,10 +148,13 @@ export const exportRoutineDetailXls = (ar, start, end) => {
             let obj = {
                 "Fecha": `${register.creationDate}`,
                 "Hora": `${register.creationTime}`,
+                "Estado": `${register?.routineState?.name ?? ''}`,
                 "Rutina": `${register?.routine?.name.split("\n").join(". ").replace(/[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2580-\u27BF]|\uD83E[\uDD10-\uDDFF]/g, '').trim()}`,
                 "Ubicación": `${register?.routineSchedule?.name.split("\n").join(". ").replace(/[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2580-\u27BF]|\uD83E[\uDD10-\uDDFF]/g, '').trim()}`,
                 "Usuario": `${register.user?.firstName ?? ''} ${register.user?.lastName ?? ''}`,
                 "Coordenadas (Lat, Long)": `${register?.cords ?? ''}`,
+                "Fecha desde:": `${register?.targetDate ?? ''} ${register?.targetTime ?? ''}`,
+                "Fecha hasta:": `${register?.targetDate2 ?? ''} ${register?.targetTime2 ?? ''}`,
                 "Observación": `${register?.observation?.split("\n").join(". ").replace(/[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2580-\u27BF]|\uD83E[\uDD10-\uDDFF]/g, '').trim() ?? ''}`,
             };
             rows.push(obj);
