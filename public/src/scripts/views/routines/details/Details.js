@@ -506,6 +506,7 @@ export class RoutineRegisters {
                                                     "ubicacion": `${register?.routineSchedule?.name.split("\n").join(". ").replace(/[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2580-\u27BF]|\uD83E[\uDD10-\uDDFF]/g, '').trim()}`,
                                                     "fecha": `${register.creationDate}`,
                                                     "hora": `${register.creationTime}`,
+                                                    "estado": `${register?.routineState?.name ?? ''}`,
                                                     "cords": `${register?.cords ?? ''}`,
                                                     "usuario": `${register.user?.firstName ?? ''} ${register.user?.lastName ?? ''}`,
                                                     "observacion": `${register?.observation?.split("\n").join(". ").replace(/[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2580-\u27BF]|\uD83E[\uDD10-\uDDFF]/g, '').trim() ?? ''}`,
