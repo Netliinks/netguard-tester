@@ -130,8 +130,9 @@ export class Routines {
                 let routine = paginatedItems[i];
                 let row = document.createElement('tr');
                 row.innerHTML += `
-          <td>${routine.name}</dt>
-          <td>${routine.isActive ? 'Sí' : 'No'}</dt>
+          <td>${routine?.name ?? ''}</dt>
+          <td>${routine?.isActive ? 'Sí' : 'No'}</dt>
+          <td>${routine?.checkLocation ? 'Sí' : 'No'}</dt>
           <td class="entity_options">
               <button class="button" id="edit-entity" data-entityId="${routine.id}">
                 <i class="fa-solid fa-pen"></i>
@@ -248,7 +249,11 @@ export class Routines {
             </div>
 
             <div class="input_checkbox">
-                <label><input type="checkbox" class="checkbox" id="entity-active" checked disabled> Activo</label>
+                <label><input type="checkbox" class="checkbox" id="entity-active" checked> Activo</label>
+            </div>
+
+            <div class="input_checkbox">
+                <label><input type="checkbox" class="checkbox" id="entity-checkLocation"> Validar Ubicación</label>
             </div>
 
           </div>
@@ -267,7 +272,8 @@ export class Routines {
                 const businessData = await currentBusiness();
                 const inputsCollection = {
                     name: document.getElementById('entity-name'),
-                    active: document.getElementById('entity-active')
+                    active: document.getElementById('entity-active'),
+                    checkLocation: document.getElementById('entity-checkLocation')
                 };
                 const raw = JSON.stringify({
                     "name": `${inputsCollection.name.value}`,
@@ -275,7 +281,8 @@ export class Routines {
                         "id": `${businessData.business.id}`},
                     "customer": {
                       "id": `${customerId}`},
-                    "isActive": `${true}`, //`${inputsCollection.active.checked ? true : false}`,
+                    "isActive": `${inputsCollection.active.checked ? true : false}`,
+                    "checkLocation": `${inputsCollection.checkLocation.checked ? true : false}`,
                     'creationDate': `${currentDateTime().date}`,
                     'creationTime': `${currentDateTime().timeHHMMSS}`,
                 });
@@ -334,6 +341,10 @@ export class Routines {
                 <label><input type="checkbox" class="checkbox" id="entity-active"> Activo</label>
             </div>
 
+            <div class="input_checkbox">
+                <label><input type="checkbox" class="checkbox" id="entity-checkLocation"> Validar Ubicación</label>
+            </div>
+
             <br>
             <br>
 
@@ -365,6 +376,11 @@ export class Routines {
               checkboxActive?.setAttribute('checked', 'true');
             }
 
+            const checkbox2Active = document.getElementById('entity-checkLocation');
+            if (data.checkLocation === true) {
+              checkbox2Active?.setAttribute('checked', 'true');
+            }
+
             inputObserver();
             this.close();
             UUpdate(entityID);
@@ -375,13 +391,15 @@ export class Routines {
               // @ts-ignore
               name: document.getElementById('entity-name'),
               // @ts-ignore
-              active: document.getElementById('entity-active')
+              active: document.getElementById('entity-active'),
+              checkLocation: document.getElementById('entity-checkLocation')
           };
             updateButton.addEventListener('click', () => {
               let raw = JSON.stringify({
                   // @ts-ignore
                   "name": `${$value.name.value}`,
-                  "isActive": `${$value.active.checked ? true : false}`
+                  "isActive": `${$value.active.checked ? true : false}`,
+                  "checkLocation": `${$value.checkLocation.checked ? true : false}`
               });
               if($value.name.value == '' || $value.name.value == null || $value.name.value == undefined){
                 alert("Debe completar el nombre");
