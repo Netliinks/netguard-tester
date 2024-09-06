@@ -369,6 +369,42 @@ export class Visits {
                         };
                         images.push(details);
                     }
+                    if (entityData?.camera5 !== undefined) {
+                        let details = {
+                            "image": `${await getFile(entityData.camera5)}`,
+                            "description": `Cámara 5 - ${entityData?.dni ?? ''}`,
+                            "icon": "camera",
+                            "id": "camera5"
+                        };
+                        images.push(details);
+                    }
+                    if (entityData?.camera6 !== undefined) {
+                        let details = {
+                            "image": `${await getFile(entityData.camera6)}`,
+                            "description": `Cámara 6 - ${entityData?.dni ?? ''}`,
+                            "icon": "camera",
+                            "id": "camera6"
+                        };
+                        images.push(details);
+                    }
+                    if (entityData?.camera7 !== undefined) {
+                        let details = {
+                            "image": `${await getFile(entityData.camera7)}`,
+                            "description": `Cámara 7 - ${entityData?.dni ?? ''}`,
+                            "icon": "camera",
+                            "id": "camera7"
+                        };
+                        images.push(details);
+                    }
+                    if (entityData?.camera8 !== undefined) {
+                        let details = {
+                            "image": `${await getFile(entityData.camera8)}`,
+                            "description": `Cámara 8 - ${entityData?.dni ?? ''}`,
+                            "icon": "camera",
+                            "id": "camera8"
+                        };
+                        images.push(details);
+                    }
                     for (let i = 0; i < images.length; i++) {
                         controlImages.innerHTML += `
                             <label><i class="fa-solid fa-${images[i].icon}"></i> ${images[i].description}</label>
