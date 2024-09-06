@@ -355,6 +355,42 @@ export class AssistControl {
                         };
                         images.push(details);
                     }
+                    if (markingData?.camera5 !== undefined) {
+                        let details = {
+                            "image": `${await getFile(markingData.camera5)}`,
+                            "description": `Cámara 5 - ${markingData.user?.dni ?? ''}`,
+                            "icon": "camera",
+                            "id": "camera5"
+                        };
+                        images.push(details);
+                    }
+                    if (markingData?.camera6 !== undefined) {
+                        let details = {
+                            "image": `${await getFile(markingData.camera6)}`,
+                            "description": `Cámara 6 - ${markingData.user?.dni ?? ''}`,
+                            "icon": "camera",
+                            "id": "camera6"
+                        };
+                        images.push(details);
+                    }
+                    if (markingData?.camera7 !== undefined) {
+                        let details = {
+                            "image": `${await getFile(markingData.camera7)}`,
+                            "description": `Cámara 7 - ${markingData.user?.dni ?? ''}`,
+                            "icon": "camera",
+                            "id": "camera7"
+                        };
+                        images.push(details);
+                    }
+                    if (markingData?.camera8 !== undefined) {
+                        let details = {
+                            "image": `${await getFile(markingData.camera8)}`,
+                            "description": `Cámara 8 - ${markingData.user?.dni ?? ''}`,
+                            "icon": "camera",
+                            "id": "camera8"
+                        };
+                        images.push(details);
+                    }
                     for (let i = 0; i < images.length; i++) {
                         _values.gallery.innerHTML += `
                         <label><i class="fa-solid fa-${images[i].icon}"></i> ${images[i].description}</label>
