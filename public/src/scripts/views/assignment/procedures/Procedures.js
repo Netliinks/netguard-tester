@@ -1,6 +1,6 @@
 // @filename: Procedures.ts
 import { deleteEntity, getEntitiesData, registerEntity, updateEntity, setFile, getUserInfo, getFile, getFilterEntityCount,getFilterEntityData } from "../../../endpoints.js";
-import { inputObserver, inputSelect, CloseDialog, filterDataByHeaderType ,fillBtnPagination} from "../../../tools.js";
+import { inputObserver, inputSelect, CloseDialog, filterDataByHeaderType ,fillBtnPagination, getPermission} from "../../../tools.js";
 import { Config } from "../../../Configs.js";
 import { tableLayout } from "./Layout.js";
 import { tableLayoutTemplate } from "./Template.js";
@@ -12,45 +12,16 @@ let infoPage = {
   count: 0,
   offset: Config.offset,
   currentPage: currentPage,
-  search: ""
+  search: "",
+  msgPermission: "",
+  actions: []
 };
 let dataPage;
 const getProcedures = async () => {
-  let raw = JSON.stringify({
-    "filter": {
-      "conditions": [
-        {
-          "property": "customer.id",
-          "operator": "=",
-          "value": `${customerId}`
-        },
-
-        {
-          "property": "user.userType",
-          "operator": "=",
-          "value": `GUARD`
-        }
-      ],
-    },
-    sort: "+name",
-    limit: Config.tableRows,
-    offset: infoPage.offset,
-    fetchPlan: 'full',
-  });
-  if (infoPage.search != "") {
-    raw = JSON.stringify({
+  const response = async () => {
+    let raw = JSON.stringify({
       "filter": {
         "conditions": [
-          {
-            "group": "OR",
-            "conditions": [
-              {
-                "property": "name",
-                "operator": "contains",
-                "value": `${infoPage.search.toLowerCase()}`
-              }
-            ]
-          },
           {
             "property": "customer.id",
             "operator": "=",
@@ -62,17 +33,70 @@ const getProcedures = async () => {
             "operator": "=",
             "value": `GUARD`
           }
-        ]
+        ],
       },
       sort: "+name",
       limit: Config.tableRows,
       offset: infoPage.offset,
       fetchPlan: 'full',
     });
+    if (infoPage.search != "") {
+      raw = JSON.stringify({
+        "filter": {
+          "conditions": [
+            {
+              "group": "OR",
+              "conditions": [
+                {
+                  "property": "name",
+                  "operator": "contains",
+                  "value": `${infoPage.search.toLowerCase()}`
+                }
+              ]
+            },
+            {
+              "property": "customer.id",
+              "operator": "=",
+              "value": `${customerId}`
+            },
+
+            {
+              "property": "user.userType",
+              "operator": "=",
+              "value": `GUARD`
+            }
+          ]
+        },
+        sort: "+name",
+        limit: Config.tableRows,
+        offset: infoPage.offset,
+        fetchPlan: 'full',
+      });
+    }
+    infoPage.count = await getFilterEntityCount("Procedure_", raw);
+    dataPage = await getFilterEntityData("Procedure_", raw);
+    return dataPage;
   }
-  infoPage.count = await getFilterEntityCount("Procedure_", raw);
-  dataPage = await getFilterEntityData("Procedure_", raw);
-  return dataPage;
+  if(Config.currentUser?.isMaster){
+    return response();
+  }else{
+    const permission = await getPermission('PROCEDURE', Config.currentUser.id);
+    if(permission.code === 3){
+        infoPage.actions = permission.message.actionsText.split(';');
+        if(infoPage.actions.includes("READ")){
+            return response();
+        }else{
+            infoPage.msgPermission = "Usuario no tiene permiso de lectura.";
+            infoPage.count = 0;
+            return [];
+        }
+    }else{
+        infoPage.msgPermission = permission.message;
+        infoPage.count = 0;
+        return [];
+    }
+    
+  }
 
 };
 export class Procedures {
@@ -116,7 +140,7 @@ export class Procedures {
     let end = start + tableRows;
     let paginatedItems = data.slice(start, end);
     if (data.length === 0) {
-      let mensaje = 'No existen datos';
+      let mensaje = `No existen datos. ${infoPage.msgPermission}`;
       if (customerId == null) { mensaje = 'Seleccione una empresa'; }
       let row = document.createElement('tr');
       row.innerHTML = `
@@ -248,7 +272,11 @@ export class Procedures {
     // register entity
     const openEditor = document.getElementById('new-entity');
     openEditor.addEventListener('click', () => {
-      renderInterface();
+      if(infoPage.actions.includes("INS") || Config.currentUser?.isMaster){
+        renderInterface();
+      }else{
+          alert("Usuario no tiene permiso de registrar.");
+      }
 
     });
     const renderInterface = async () => {
@@ -319,31 +347,35 @@ export class Procedures {
 
       registerButton.addEventListener('click', async (e) => {
         e.preventDefault();
-        const name = document.getElementById('entity-name')
-        let _userInfo = await getUserInfo();
-        const customerId = localStorage.getItem('customer_id');
-        const inputsCollection = {
-          name: document.getElementById('entity-name'),
-        };
-        const raw = JSON.stringify({
-          "name": `${inputsCollection.name.value}`,
-          "file": fileProcedure,
-          "user": {
-            "id": `${_userInfo['attributes']['id']}`
-          },
-          "customer": {
-            "id": `${customerId}`
-          }
+        if(!infoPage.actions.includes("INS") && !Config.currentUser?.isMaster){
+          alert("Usuario no tiene permiso de registrar.");
+        }else{
+          const name = document.getElementById('entity-name')
+          //let _userInfo = await getUserInfo();
+          const customerId = localStorage.getItem('customer_id');
+          const inputsCollection = {
+            name: document.getElementById('entity-name'),
+          };
+          const raw = JSON.stringify({
+            "name": `${inputsCollection.name.value}`,
+            "file": fileProcedure,
+            "user": {
+              "id": `${Config.currentUser.id}` //`${_userInfo['attributes']['id']}`
+            },
+            "customer": {
+              "id": `${customerId}`
+            }
 
-        });
-        if (name.value.trim() === '' || name.value.trim() === null) {
-          alert('Nombre del procedimiento vacío')
-        }
-        else if (fileProcedure == '' || fileProcedure === null || fileProcedure === undefined) {
-          alert('Archivo del procedimiento vacío')
-        }
-        else {
-          reg(raw);
+          });
+          if (name.value.trim() === '' || name.value.trim() === null) {
+            alert('Nombre del procedimiento vacío')
+          }
+          else if (fileProcedure == '' || fileProcedure === null || fileProcedure === undefined) {
+            alert('Archivo del procedimiento vacío')
+          }
+          else {
+            reg(raw);
+          }
         }
       });
 
@@ -369,45 +401,49 @@ export class Procedures {
     remove.forEach((remove) => {
       const entityId = remove.dataset.entityid;
       remove.addEventListener('click', () => {
-        this.dialogContainer.style.display = 'flex';
-        this.dialogContainer.innerHTML = `
-                <div class="dialog_content" id="dialog-content">
-                  <div class="dialog dialog_danger">
-                    <div class="dialog_container">
-                      <div class="dialog_header">
-                        <h2>¿Deseas eliminar este Procedimiento?</h2>
-                      </div>
+        if(!infoPage.actions.includes("DLT") && !Config.currentUser?.isMaster){
+          alert("Usuario no tiene permiso de eliminar.");
+        }else{
+          this.dialogContainer.style.display = 'flex';
+          this.dialogContainer.innerHTML = `
+                  <div class="dialog_content" id="dialog-content">
+                    <div class="dialog dialog_danger">
+                      <div class="dialog_container">
+                        <div class="dialog_header">
+                          <h2>¿Deseas eliminar este Procedimiento?</h2>
+                        </div>
 
-                      <div class="dialog_message">
-                        <p>Esta acción no se puede revertir</p>
-                      </div>
+                        <div class="dialog_message">
+                          <p>Esta acción no se puede revertir</p>
+                        </div>
 
-                      <div class="dialog_footer">
-                        <button class="btn btn_primary" id="cancel">Cancelar</button>
-                        <button class="btn btn_danger" id="delete">Eliminar</button>
+                        <div class="dialog_footer">
+                          <button class="btn btn_primary" id="cancel">Cancelar</button>
+                          <button class="btn btn_danger" id="delete">Eliminar</button>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              `;
-        const deleteButton = document.getElementById('delete');
-        const cancelButton = document.getElementById('cancel');
-        const dialogContent = document.getElementById('dialog-content');
-        deleteButton.onclick = async () => {
-          deleteEntity('Procedure_', entityId)
-            .then((res) => {
-              setTimeout(async () => {
-                //let data = await getUsers();
-                const tableBody = document.getElementById('datatable-body');
-                new CloseDialog().x(dialogContent);
-                new Procedures().render(infoPage.offset, infoPage.currentPage, infoPage.search);
-              }, 1000);
-            });
-        };
-        cancelButton.onclick = () => {
-          new CloseDialog().x(dialogContent);
-          //this.render();
-        };
+                `;
+          const deleteButton = document.getElementById('delete');
+          const cancelButton = document.getElementById('cancel');
+          const dialogContent = document.getElementById('dialog-content');
+          deleteButton.onclick = async () => {
+            deleteEntity('Procedure_', entityId)
+              .then((res) => {
+                setTimeout(async () => {
+                  //let data = await getUsers();
+                  const tableBody = document.getElementById('datatable-body');
+                  new CloseDialog().x(dialogContent);
+                  new Procedures().render(infoPage.offset, infoPage.currentPage, infoPage.search);
+                }, 1000);
+              });
+          };
+          cancelButton.onclick = () => {
+            new CloseDialog().x(dialogContent);
+            //this.render();
+          };
+        }
       });
     });
   }

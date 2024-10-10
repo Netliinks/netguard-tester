@@ -5,7 +5,7 @@
 //
 import { Config } from "../../../Configs.js";
 import { getEntityData, getFile, getFilterEntityData, getFilterEntityCount } from "../../../endpoints.js";
-import { CloseDialog, renderRightSidebar, filterDataByHeaderType, inputObserver, pageNumbers, fillBtnPagination } from "../../../tools.js";
+import { CloseDialog, renderRightSidebar, filterDataByHeaderType, inputObserver, pageNumbers, fillBtnPagination, getPermission } from "../../../tools.js";
 import { UIContentLayout, UIRightSidebar } from "./Layout.js";
 import { UITableSkeletonTemplate } from "./Template.js";
 import { exportReportCsv, exportReportPdf, exportReportXls } from "../../../exportFiles/reports.js";
@@ -18,62 +18,86 @@ let infoPage = {
     count: 0,
     offset: Config.offset,
     currentPage: currentPage,
-    search: ""
+    search: "",
+    msgPermission: "",
+    actions: []
 };
 let dataPage;
 const GetNotes = async () => {
-    //const notesRaw = await getEntitiesData('Note');
-    //const notes = notesRaw.filter((data) => data.customer?.id === `${customerId}`);
-    let raw = JSON.stringify({
-        "filter": {
-            "conditions": [
-                {
-                    "property": "customer.id",
-                    "operator": "=",
-                    "value": `${customerId}`
-                }
-            ],
-        },
-        sort: "-createdDate",
-        limit: Config.tableRows,
-        offset: infoPage.offset,
-        fetchPlan: 'full',
-    });
-    if (infoPage.search != "") {
-        raw = JSON.stringify({
+    const response = async () => {
+        //const notesRaw = await getEntitiesData('Note');
+        //const notes = notesRaw.filter((data) => data.customer?.id === `${customerId}`);
+        let raw = JSON.stringify({
             "filter": {
                 "conditions": [
-                    {
-                        "group": "OR",
-                        "conditions": [
-                            {
-                                "property": "title",
-                                "operator": "contains",
-                                "value": `${infoPage.search.toLowerCase()}`
-                            },
-                            {
-                                "property": "content",
-                                "operator": "contains",
-                                "value": `${infoPage.search.toLowerCase()}`
-                            }
-                        ]
-                    },
                     {
                         "property": "customer.id",
                         "operator": "=",
                         "value": `${customerId}`
                     }
-                ]
+                ],
             },
             sort: "-createdDate",
             limit: Config.tableRows,
             offset: infoPage.offset,
             fetchPlan: 'full',
         });
+        if (infoPage.search != "") {
+            raw = JSON.stringify({
+                "filter": {
+                    "conditions": [
+                        {
+                            "group": "OR",
+                            "conditions": [
+                                {
+                                    "property": "title",
+                                    "operator": "contains",
+                                    "value": `${infoPage.search.toLowerCase()}`
+                                },
+                                {
+                                    "property": "content",
+                                    "operator": "contains",
+                                    "value": `${infoPage.search.toLowerCase()}`
+                                }
+                            ]
+                        },
+                        {
+                            "property": "customer.id",
+                            "operator": "=",
+                            "value": `${customerId}`
+                        }
+                    ]
+                },
+                sort: "-createdDate",
+                limit: Config.tableRows,
+                offset: infoPage.offset,
+                fetchPlan: 'full',
+            });
+        }
+        infoPage.count = await getFilterEntityCount("Note", raw);
+        dataPage = await getFilterEntityData("Note", raw);
+        return dataPage;
     }
-    infoPage.count = await getFilterEntityCount("Note", raw);
-    dataPage = await getFilterEntityData("Note", raw);
-    return dataPage;
+    if(Config.currentUser?.isMaster){
+        return response();
+    }else{
+        const permission = await getPermission('NOTE', Config.currentUser.id);
+        if(permission.code === 3){
+            infoPage.actions = permission.message.actionsText.split(';');
+            if(infoPage.actions.includes("READ")){
+                return response();
+            }else{
+                infoPage.msgPermission = "Usuario no tiene permiso de lectura.";
+                infoPage.count = 0;
+                return [];
+            }
+        }else{
+            infoPage.msgPermission = permission.message;
+            infoPage.count = 0;
+            return [];
+        }
+        
+    }
 };
 export class Notes {
     constructor() {
@@ -111,7 +135,7 @@ export class Notes {
             let paginatedItems = notes.slice(start, end);
             // Show message if page is empty
             if (notes.length === 0) {
-                let mensaje = 'No existen datos';
+                let mensaje = `No existen datos. ${infoPage.msgPermission}`;
                 if(customerId == null){mensaje = 'Seleccione una empresa';}
                 let row = document.createElement('TR');
                 row.innerHTML = `
@@ -245,165 +269,173 @@ export class Notes {
         this.export = () => {
                 const exportNotes = document.getElementById('export-entities');
                 exportNotes.addEventListener('click', async() => {
-                    this.dialogContainer.style.display = 'block';
-                    this.dialogContainer.innerHTML = `
-                        <div class="dialog_content" id="dialog-content">
-                            <div class="dialog">
-                                <div class="dialog_container padding_8">
-                                    <div class="dialog_header">
-                                        <h2>Seleccionar la fecha</h2>
-                                    </div>
-
-                                    <div class="dialog_message padding_8">
-                                        <div class="form_group">
-                                            <div class="form_input">
-                                                <label class="form_label" for="start-date">Desde:</label>
-                                                <input type="date" class="input_date input_date-start" id="start-date" name="start-date">
-                                            </div>
-                            
-                                            <div class="form_input">
-                                                <label class="form_label" for="end-date">Hasta:</label>
-                                                <input type="date" class="input_date input_date-end" id="end-date" name="end-date">
-                                            </div>
-
-                                            <label for="exportCsv">
-                                                <input type="radio" id="exportCsv" name="exportOption" value="csv" /> CSV
-                                            </label>
-
-                                            <label for="exportXls">
-                                                <input type="radio" id="exportXls" name="exportOption" value="xls" checked /> XLS
-                                            </label>
-
-                                            <label for="exportPdf">
-                                                <input type="radio" id="exportPdf" name="exportOption" value="pdf" /> PDF
-                                            </label>
+                    if(!infoPage.actions.includes("DWN") && !Config.currentUser?.isMaster){
+                        alert("Usuario no tiene permiso de exportar.");
+                    }else{
+                        this.dialogContainer.style.display = 'block';
+                        this.dialogContainer.innerHTML = `
+                            <div class="dialog_content" id="dialog-content">
+                                <div class="dialog">
+                                    <div class="dialog_container padding_8">
+                                        <div class="dialog_header">
+                                            <h2>Seleccionar la fecha</h2>
                                         </div>
-                                    </div>
 
-                                    <div class="dialog_footer">
-                                        <button class="btn btn_primary" id="cancel">Cancelar</button>
-                                        <button class="btn btn_danger" id="export-data">Exportar</button>
+                                        <div class="dialog_message padding_8">
+                                            <div class="form_group">
+                                                <div class="form_input">
+                                                    <label class="form_label" for="start-date">Desde:</label>
+                                                    <input type="date" class="input_date input_date-start" id="start-date" name="start-date">
+                                                </div>
+                                
+                                                <div class="form_input">
+                                                    <label class="form_label" for="end-date">Hasta:</label>
+                                                    <input type="date" class="input_date input_date-end" id="end-date" name="end-date">
+                                                </div>
+
+                                                <label for="exportCsv">
+                                                    <input type="radio" id="exportCsv" name="exportOption" value="csv" /> CSV
+                                                </label>
+
+                                                <label for="exportXls">
+                                                    <input type="radio" id="exportXls" name="exportOption" value="xls" checked /> XLS
+                                                </label>
+
+                                                <label for="exportPdf">
+                                                    <input type="radio" id="exportPdf" name="exportOption" value="pdf" /> PDF
+                                                </label>
+                                            </div>
+                                        </div>
+
+                                        <div class="dialog_footer">
+                                            <button class="btn btn_primary" id="cancel">Cancelar</button>
+                                            <button class="btn btn_danger" id="export-data">Exportar</button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
-                    `;
-                    let fecha = new Date(); //Fecha actual
-                    let mes = fecha.getMonth()+1; //obteniendo mes
-                    let dia = fecha.getDate(); //obteniendo dia
-                    let anio = fecha.getFullYear(); //obteniendo año
-                    if(dia<10)
-                        dia='0'+dia; //agrega cero si el menor de 10
-                    if(mes<10)
-                        mes='0'+mes //agrega cero si el menor de 10
+                        `;
+                        let fecha = new Date(); //Fecha actual
+                        let mes = fecha.getMonth()+1; //obteniendo mes
+                        let dia = fecha.getDate(); //obteniendo dia
+                        let anio = fecha.getFullYear(); //obteniendo año
+                        if(dia<10)
+                            dia='0'+dia; //agrega cero si el menor de 10
+                        if(mes<10)
+                            mes='0'+mes //agrega cero si el menor de 10
 
-                    document.getElementById("start-date").value = anio+"-"+mes+"-"+dia;
-                    document.getElementById("end-date").value = anio+"-"+mes+"-"+dia;
-                    inputObserver();
-                    const _closeButton = document.getElementById('cancel');
-                    const exportButton = document.getElementById('export-data');
-                    const _dialog = document.getElementById('dialog-content');
-                    exportButton.addEventListener('click', async() => {
-                        const _values = {
-                            start: document.getElementById('start-date'),
-                            end: document.getElementById('end-date'),
-                            exportOption: document.getElementsByName('exportOption')
-                        }
-                        //console.log(_values.start.value)
-                        //console.log(_values.end.value)
-                        //const headers = ['Título', 'Contenido', 'Autor', 'Fecha', 'Hora']
-                        let rawExport = JSON.stringify({
-                            "filter": {
-                                "conditions": [
-                                    {
-                                        "property": "customer.id",
-                                        "operator": "=",
-                                        "value": `${customerId}`
+                        document.getElementById("start-date").value = anio+"-"+mes+"-"+dia;
+                        document.getElementById("end-date").value = anio+"-"+mes+"-"+dia;
+                        inputObserver();
+                        const _closeButton = document.getElementById('cancel');
+                        const exportButton = document.getElementById('export-data');
+                        const _dialog = document.getElementById('dialog-content');
+                        exportButton.addEventListener('click', async() => {
+                            if(!infoPage.actions.includes("DWN") && !Config.currentUser?.isMaster){
+                                alert("Usuario no tiene permiso de exportar.");
+                            }else{
+                                const _values = {
+                                    start: document.getElementById('start-date'),
+                                    end: document.getElementById('end-date'),
+                                    exportOption: document.getElementsByName('exportOption')
+                                }
+                                //console.log(_values.start.value)
+                                //console.log(_values.end.value)
+                                //const headers = ['Título', 'Contenido', 'Autor', 'Fecha', 'Hora']
+                                let rawExport = JSON.stringify({
+                                    "filter": {
+                                        "conditions": [
+                                            {
+                                                "property": "customer.id",
+                                                "operator": "=",
+                                                "value": `${customerId}`
+                                            },
+                                            {
+                                                "property": "creationDate",
+                                                "operator": ">=",
+                                                "value": `${_values.start.value}T00:00:00`
+                                            },
+                                            {
+                                                "property": "creationDate",
+                                                "operator": "<=",
+                                                "value": `${_values.end.value}T23:59:59`
+                                            }
+                                        ],
                                     },
-                                    {
-                                        "property": "creationDate",
-                                        "operator": ">=",
-                                        "value": `${_values.start.value}T00:00:00`
-                                    },
-                                    {
-                                        "property": "creationDate",
-                                        "operator": "<=",
-                                        "value": `${_values.end.value}T23:59:59`
-                                    }
-                                ],
-                            },
-                            sort: "-createdDate",
-                            fetchPlan: 'full',
-                        });
-                        const notes = await getFilterEntityData("Note", rawExport); //await GetNotes();
-                        for (let i = 0; i < _values.exportOption.length; i++) {
-                            let ele = _values.exportOption[i];
-                            if (ele.type = "radio") {
-                                if (ele.checked) {
-                                    if (ele.value == "xls") {
-                                        // @ts-ignore
-                                        exportReportXls(notes, _values.start.value, _values.end.value);
-                                    }
-                                    else if (ele.value == "csv") {
-                                        // @ts-ignore
-                                        exportReportCsv(notes, _values.start.value, _values.end.value);
-                                    }
-                                    else if (ele.value == "pdf") {
-                                        let rows = [];
-                                        for (let i = 0; i < notes.length; i++) {
-                                            let note = notes[i];
-                                            let noteCreationDateAndTime = note.creationDate.split('T');
-                                            let noteCreationDate = noteCreationDateAndTime[0];
-                                            let noteCreationTime = noteCreationDateAndTime[1];
-                                            // @ts-ignore
-                                            //if (noteCreationDate >= _values.start.value && noteCreationDate <= _values.end.value) {
-                                                let image = '';
-                                                if (note.attachment !== undefined) {
-                                                    image = await getFile(note.attachment);
+                                    sort: "-createdDate",
+                                    fetchPlan: 'full',
+                                });
+                                const notes = await getFilterEntityData("Note", rawExport); //await GetNotes();
+                                for (let i = 0; i < _values.exportOption.length; i++) {
+                                    let ele = _values.exportOption[i];
+                                    if (ele.type = "radio") {
+                                        if (ele.checked) {
+                                            if (ele.value == "xls") {
+                                                // @ts-ignore
+                                                exportReportXls(notes, _values.start.value, _values.end.value);
+                                            }
+                                            else if (ele.value == "csv") {
+                                                // @ts-ignore
+                                                exportReportCsv(notes, _values.start.value, _values.end.value);
+                                            }
+                                            else if (ele.value == "pdf") {
+                                                let rows = [];
+                                                for (let i = 0; i < notes.length; i++) {
+                                                    let note = notes[i];
+                                                    let noteCreationDateAndTime = note.creationDate.split('T');
+                                                    let noteCreationDate = noteCreationDateAndTime[0];
+                                                    let noteCreationTime = noteCreationDateAndTime[1];
+                                                    // @ts-ignore
+                                                    //if (noteCreationDate >= _values.start.value && noteCreationDate <= _values.end.value) {
+                                                        let image = '';
+                                                        if (note.attachment !== undefined) {
+                                                            image = await getFile(note.attachment);
+                                                        }
+                                                        let obj = {
+                                                            "titulo": `${note.title.split("\n").join(". ").replace(/[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2580-\u27BF]|\uD83E[\uDD10-\uDDFF]/g, '').trim()}`,
+                                                            "fecha": `${noteCreationDate}`,
+                                                            "hora": `${noteCreationTime}`,
+                                                            "usuario": `${note.user?.firstName ?? ''} ${note.user?.lastName ?? ''}`,
+                                                            "contenido": `${note.content.split("\n").join(". ").replace(/[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2580-\u27BF]|\uD83E[\uDD10-\uDDFF]/g, '').trim()}`,
+                                                            "imagen": `${image}`
+                                                        };
+                                                        rows.push(obj);
+                                                    //}
                                                 }
-                                                let obj = {
-                                                    "titulo": `${note.title.split("\n").join(". ").replace(/[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2580-\u27BF]|\uD83E[\uDD10-\uDDFF]/g, '').trim()}`,
-                                                    "fecha": `${noteCreationDate}`,
-                                                    "hora": `${noteCreationTime}`,
-                                                    "usuario": `${note.user?.firstName ?? ''} ${note.user?.lastName ?? ''}`,
-                                                    "contenido": `${note.content.split("\n").join(". ").replace(/[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2580-\u27BF]|\uD83E[\uDD10-\uDDFF]/g, '').trim()}`,
-                                                    "imagen": `${image}`
-                                                };
-                                                rows.push(obj);
-                                            //}
+                                                // @ts-ignore
+                                                exportReportPdf(rows, _values.start.value, _values.end.value);
+                                            }
                                         }
-                                        // @ts-ignore
-                                        exportReportPdf(rows, _values.start.value, _values.end.value);
                                     }
                                 }
                             }
-                        }
-                    });
-                    _closeButton.onclick = () => {
-                        new CloseDialog().x(_dialog);
-                    };
-                    /*const getFilteredNote = async(_values) =>{
-                        const notes = await getEntitiesData('Note');
-                        const FCustomer = notes.filter(async (data) => {
-                            let userCustomer = await getEntityData('User', `${data.user.id}`);
-                            userCustomer.customer.id === `${currentUserInfo.customer.id}`
                         });
-                        //console.log(`_values.start.value ${_values.start.value}`)
-                            const Fdesde = FCustomer.filter((data) => {
-                            let noteCreationDateAndTime = data.creationDate.split('T');
-                            let noteCreationDate = noteCreationDateAndTime[0];
-                            //console.log(`noteCreationDate ${noteCreationDate}`)
-                            noteCreationDate >= _values.start.value
-                        });/*
-                        console.log(`Fdesde ${Fdesde}`)
-                        const Fhasta = Fdesde.filter((data) => {
-                            let noteCreationDateAndTime = data.creationDate.split('T');
-                            let noteCreationDate = noteCreationDateAndTime[0];
-                            noteCreationDate <= `${_values.end.value}`
-                        });
-                        //console.log(Fdesde)
-                        return FCustomer;
-                    }*/
+                        _closeButton.onclick = () => {
+                            new CloseDialog().x(_dialog);
+                        };
+                        /*const getFilteredNote = async(_values) =>{
+                            const notes = await getEntitiesData('Note');
+                            const FCustomer = notes.filter(async (data) => {
+                                let userCustomer = await getEntityData('User', `${data.user.id}`);
+                                userCustomer.customer.id === `${currentUserInfo.customer.id}`
+                            });
+                            //console.log(`_values.start.value ${_values.start.value}`)
+                                const Fdesde = FCustomer.filter((data) => {
+                                let noteCreationDateAndTime = data.creationDate.split('T');
+                                let noteCreationDate = noteCreationDateAndTime[0];
+                                //console.log(`noteCreationDate ${noteCreationDate}`)
+                                noteCreationDate >= _values.start.value
+                            });/*
+                            console.log(`Fdesde ${Fdesde}`)
+                            const Fhasta = Fdesde.filter((data) => {
+                                let noteCreationDateAndTime = data.creationDate.split('T');
+                                let noteCreationDate = noteCreationDateAndTime[0];
+                                noteCreationDate <= `${_values.end.value}`
+                            });
+                            //console.log(Fdesde)
+                            return FCustomer;
+                        }*/
+                    }
                         
                     
                 });

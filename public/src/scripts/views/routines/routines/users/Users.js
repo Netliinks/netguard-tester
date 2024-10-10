@@ -11,76 +11,91 @@ let infoPage = {
   count: 0,
   offset: Config.offset,
   currentPage: currentPage,
-  search: ""
+  search: "",
+  msgPermission: "",
+  actions: []
 };
 let dataPage;
 let routine;
 const currentBusiness = async() => {
-    const currentUser = await getUserInfo();
-    const userid = await getEntityData('User', `${currentUser.attributes.id}`);
-    return userid;
-  }
+    //const currentUser = await getUserInfo();
+    //const userid = await getEntityData('User', `${currentUser.attributes.id}`);
+    return Config.currentUser;
+}
 const getUsers = async (routineId) => {
     //nombre de la entidad
     /*const location = await getEntitiesData('Location');
     const FCustomer = location.filter((data) => `${data.customer?.id}` === `${customerId}`);
     return FCustomer;*/
     routine = await getEntityData("Routine", routineId)
-    let raw = JSON.stringify({
-      "filter": {
-          "conditions": [
-              {
-                  "property": "customer.id",
-                  "operator": "=",
-                  "value": `${customerId}`
-              },
-              {
-                "property": "routine.id",
-                "operator": "=",
-                "value": `${routineId}`
-              },
-          ],
-      },
-      sort: "-createdDate",
-      limit: Config.tableRows,
-      offset: infoPage.offset,
-      fetchPlan: 'full',
-  });
-  if (infoPage.search != "") {
-      raw = JSON.stringify({
-          "filter": {
-              "conditions": [
-                  {
-                      "group": "OR",
-                      "conditions": [
-                          {
-                              "property": "user.username",
-                              "operator": "contains",
-                              "value": `${infoPage.search.toLowerCase()}`
-                          }
-                      ]
-                  },
-                  {
-                      "property": "customer.id",
-                      "operator": "=",
-                      "value": `${customerId}`
-                  },
-                  {
-                    "property": "routine.id",
-                    "operator": "=",
-                    "value": `${routine.id}`
-                  },
-              ]
-          },
-          sort: "-createdDate",
-          limit: Config.tableRows,
-          offset: infoPage.offset,
-          fetchPlan: 'full',
-      });
-  }
-  infoPage.count = await getFilterEntityCount("RoutineUser", raw);
-  dataPage = await getFilterEntityData("RoutineUser", raw);
-  return dataPage;
+    const response = async () => {
+        let raw = JSON.stringify({
+            "filter": {
+                "conditions": [
+                    {
+                        "property": "customer.id",
+                        "operator": "=",
+                        "value": `${customerId}`
+                    },
+                    {
+                        "property": "routine.id",
+                        "operator": "=",
+                        "value": `${routineId}`
+                    },
+                ],
+            },
+            sort: "-createdDate",
+            limit: Config.tableRows,
+            offset: infoPage.offset,
+            fetchPlan: 'full',
+        });
+        if (infoPage.search != "") {
+            raw = JSON.stringify({
+                "filter": {
+                    "conditions": [
+                        {
+                            "group": "OR",
+                            "conditions": [
+                                {
+                                    "property": "user.username",
+                                    "operator": "contains",
+                                    "value": `${infoPage.search.toLowerCase()}`
+                                }
+                            ]
+                        },
+                        {
+                            "property": "customer.id",
+                            "operator": "=",
+                            "value": `${customerId}`
+                        },
+                        {
+                            "property": "routine.id",
+                            "operator": "=",
+                            "value": `${routine.id}`
+                        },
+                    ]
+                },
+                sort: "-createdDate",
+                limit: Config.tableRows,
+                offset: infoPage.offset,
+                fetchPlan: 'full',
+            });
+        }
+        infoPage.count = await getFilterEntityCount("RoutineUser", raw);
+        dataPage = await getFilterEntityData("RoutineUser", raw);
+        return dataPage;
+    }
+    if(Config.currentUser?.isMaster){
+        return response();
+    }else{
+    if(infoPage.actions.includes("READ")){
+        return response();
+    }else{
+        infoPage.msgPermission = "Usuario no tiene permiso de lectura.";
+        infoPage.count = 0;
+        return [];
+    }
+    }
 };
 export class RoutineUsers {
     constructor() {
@@ -108,10 +123,11 @@ export class RoutineUsers {
         };
     }
 
-    async render(offset, actualPage, search, routineId) {
+    async render(offset, actualPage, search, routineId, actions) {
         infoPage.offset = offset;
         infoPage.currentPage = actualPage;
         infoPage.search = search;
+        infoPage.actions = actions;
         this.content.innerHTML = '';
         this.content.innerHTML = tableLayout;
         const tableBody = document.getElementById('datatable-body');
@@ -133,7 +149,7 @@ export class RoutineUsers {
         let end = start + tableRows;
         let paginatedItems = data.slice(start, end);
         if (data.length === 0) {
-            let mensaje = 'No existen datos';
+            let mensaje = `No existen datos. ${infoPage.msgPermission}`;
             if(customerId == null){mensaje = 'Seleccione una empresa';}
             let row = document.createElement('tr');
             row.innerHTML = `
@@ -227,7 +243,11 @@ export class RoutineUsers {
         // register entity
         const openEditor = document.getElementById('new-entity');
         openEditor.addEventListener('click', () => {
-            modalTable(0, "");
+            if(infoPage.actions.includes("INS") || Config.currentUser?.isMaster){
+                modalTable(0, "");
+            }else{
+                alert("Usuario no tiene permiso de registrar.");
+            }
         });
         async function modalTable(offset, search) {
           const dialogContainer = document.getElementById('app-dialogs');
@@ -422,39 +442,43 @@ export class RoutineUsers {
               new CloseDialog().x(_dialog);
           };
           _saveButton.onclick = () => {
-            _selectUser.forEach(async (select) => {
-              if(select.checked){
-                const entityId = select.dataset.entityid;
-                const existGuard = await getDetails2('routine.id', routine.id, 'user.id', entityId, 'RoutineUser');
-                if(existGuard.length == 0){
-                  const raw = JSON.stringify({ 
-                    "business": {
-                        "id": `${businessData.business.id}`
-                    },                 
-                    "customer": {
-                        "id": `${customerId}`
-                    },
-                    "routine": {
-                      "id": `${routine.id}`
-                    },
-                    "user": {
-                      "id": `${entityId}`
-                    },
-                    'creationDate': `${currentDateTime().date}`,
-                    'creationTime': `${currentDateTime().timeHHMMSS}`,
-                  });
-                  registerEntity(raw, 'RoutineUser').then((res) => {
-                    setTimeout(() => {
-                        new CloseDialog().x(_dialog);
-                        new RoutineUsers().render(Config.offset, Config.currentPage, infoPage.search, routine.id);
-                    }, 1000);
-                  });
+            if(!infoPage.actions.includes("INS") && !Config.currentUser?.isMaster){
+                alert("Usuario no tiene permiso de registrar.");
+            }else{
+                _selectUser.forEach(async (select) => {
+                if(select.checked){
+                    const entityId = select.dataset.entityid;
+                    const existGuard = await getDetails2('routine.id', routine.id, 'user.id', entityId, 'RoutineUser');
+                    if(existGuard.length == 0){
+                    const raw = JSON.stringify({ 
+                        "business": {
+                            "id": `${businessData.business.id}`
+                        },                 
+                        "customer": {
+                            "id": `${customerId}`
+                        },
+                        "routine": {
+                        "id": `${routine.id}`
+                        },
+                        "user": {
+                        "id": `${entityId}`
+                        },
+                        'creationDate': `${currentDateTime().date}`,
+                        'creationTime': `${currentDateTime().timeHHMMSS}`,
+                    });
+                    registerEntity(raw, 'RoutineUser').then((res) => {
+                        setTimeout(() => {
+                            new CloseDialog().x(_dialog);
+                            new RoutineUsers().render(Config.offset, Config.currentPage, infoPage.search, routine.id);
+                        }, 1000);
+                    });
+                    }
+                    
                 }
                 
-              }
-              
-            
-          });
+                
+                });
+            }
         };
           nextModalButton.onclick = () => {
               offset = Config.modalRows + (offset);
@@ -474,39 +498,47 @@ export class RoutineUsers {
         remove.forEach((remove) => {
             const entityId = remove.dataset.entityid;
             remove.addEventListener('click', () => {
-                this.dialogContainer.style.display = 'flex';
-                this.dialogContainer.innerHTML = `
-          <div class="dialog_content" id="dialog-content">
-            <div class="dialog dialog_danger">
-              <div class="dialog_container">
-                <div class="dialog_header">
-                  <h2>¿Deseas eliminar este guardia de la rutina?</h2>
+                if(!infoPage.actions.includes("DLT") && !Config.currentUser?.isMaster){
+                    alert("Usuario no tiene permiso de eliminar.");
+                }else{
+                    this.dialogContainer.style.display = 'flex';
+                    this.dialogContainer.innerHTML = `
+            <div class="dialog_content" id="dialog-content">
+                <div class="dialog dialog_danger">
+                <div class="dialog_container">
+                    <div class="dialog_header">
+                    <h2>¿Deseas eliminar este guardia de la rutina?</h2>
+                    </div>
+                    <div class="dialog_message">
+                    <p>Esta acción no se puede revertir</p>
+                    </div>
+                    <div class="dialog_footer">
+                    <button class="btn btn_primary" id="cancel">Cancelar</button>
+                    <button class="btn btn_danger" id="delete">Eliminar</button>
+                    </div>
                 </div>
-                <div class="dialog_message">
-                  <p>Esta acción no se puede revertir</p>
                 </div>
-                <div class="dialog_footer">
-                  <button class="btn btn_primary" id="cancel">Cancelar</button>
-                  <button class="btn btn_danger" id="delete">Eliminar</button>
-                </div>
-              </div>
             </div>
-          </div>
-        `;
-                // delete button
-                // cancel button
-                // dialog content
-                const deleteButton = document.getElementById('delete');
-                const cancelButton = document.getElementById('cancel');
-                const dialogContent = document.getElementById('dialog-content');
-                deleteButton.onclick = () => {
-                    deleteEntity('RoutineUser', entityId)
-                        .then(res => new RoutineUsers().render(infoPage.offset, infoPage.currentPage, infoPage.search, routine.id));
-                    new CloseDialog().x(dialogContent);
-                };
-                cancelButton.onclick = () => {
-                    new CloseDialog().x(dialogContent);
-                };
+            `;
+                    // delete button
+                    // cancel button
+                    // dialog content
+                    const deleteButton = document.getElementById('delete');
+                    const cancelButton = document.getElementById('cancel');
+                    const dialogContent = document.getElementById('dialog-content');
+                    deleteButton.onclick = () => {
+                        if(!infoPage.actions.includes("DLT") && !Config.currentUser?.isMaster){
+                            alert("Usuario no tiene permiso de eliminar.");
+                        }else{
+                            deleteEntity('RoutineUser', entityId)
+                                .then(res => new RoutineUsers().render(infoPage.offset, infoPage.currentPage, infoPage.search, routine.id));
+                            new CloseDialog().x(dialogContent);
+                        }
+                    };
+                    cancelButton.onclick = () => {
+                        new CloseDialog().x(dialogContent);
+                    };
+                }
             });
         });
     }

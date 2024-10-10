@@ -5,7 +5,7 @@
 //
 import { Config } from "../../../Configs.js";
 import { getEntityData, getFilterEntityData, getFile } from "../../../endpoints.js";
-import { CloseDialog, drawTagsIntoTables, renderRightSidebar, filterDataByHeaderType, inputObserver, verifyUserType, pageNumbers, fillBtnPagination, calculateGestionMarcation } from "../../../tools.js";
+import { CloseDialog, drawTagsIntoTables, renderRightSidebar, filterDataByHeaderType, inputObserver, verifyUserType, pageNumbers, fillBtnPagination, calculateGestionMarcation, getPermission } from "../../../tools.js";
 import { UIContentLayout } from "./Layout.js";
 import { UITableSkeletonTemplate } from "./Template.js";
 import { exportMarcationsCsv, exportMarcationsPdf, exportMarcationsXls } from "../../../exportFiles/marcations2.js";
@@ -19,61 +19,18 @@ let infoPage = {
     offset: Config.offset,
     currentPage: currentPage,
     search: "",
-    date: null
+    date: null,
+    msgPermission: "",
+    actions: []
 };
 let dataPage;
 const GetAssistControl = async () => {
-    //const assistControlRaw = await getEntitiesData('Marcation');
-    //const assistControl = assistControlRaw.filter((data) => data.customer?.id === `${customerId}`);
-    let raw = JSON.stringify({
-        "filter": {
-            "conditions": [
-                {
-                    "property": "customer.id",
-                    "operator": "=",
-                    "value": `${customerId}`
-                },
-                {
-                    "property": "ingressDate",
-                    "operator": "=",
-                    "value": `${infoPage.date}`
-                }
-            ],
-        },
-        sort: "-createdDate",
-        //limit: Config.tableRows,
-        //offset: infoPage.offset,
-        fetchPlan: 'full',
-    });
-    if (infoPage.search != "") {
-        raw = JSON.stringify({
+    const response = async () => {
+        //const assistControlRaw = await getEntitiesData('Marcation');
+        //const assistControl = assistControlRaw.filter((data) => data.customer?.id === `${customerId}`);
+        let raw = JSON.stringify({
             "filter": {
                 "conditions": [
-                    {
-                        "group": "OR",
-                        "conditions": [
-                            {
-                                "property": "user.dni",
-                                "operator": "contains",
-                                "value": `${infoPage.search.toLowerCase()}`
-                            },
-                            {
-                                "property": "user.firstName",
-                                "operator": "contains",
-                                "value": `${infoPage.search.toLowerCase()}`
-                            },
-                            {
-                                "property": "user.secondLastName",
-                                "operator": "contains",
-                                "value": `${infoPage.search.toLowerCase()}`
-                            },
-                            {
-                                "property": "marcationState.name",
-                                "operator": "contains",
-                                "value": `${infoPage.search.toLowerCase()}`
-                            }
-                        ]
-                    },
                     {
                         "property": "customer.id",
                         "operator": "=",
@@ -84,17 +41,94 @@ const GetAssistControl = async () => {
                         "operator": "=",
                         "value": `${infoPage.date}`
                     }
-                ]
+                ],
             },
             sort: "-createdDate",
             //limit: Config.tableRows,
             //offset: infoPage.offset,
             fetchPlan: 'full',
         });
+        if (infoPage.search != "") {
+            raw = JSON.stringify({
+                "filter": {
+                    "conditions": [
+                        {
+                            "group": "OR",
+                            "conditions": [
+                                {
+                                    "property": "user.dni",
+                                    "operator": "contains",
+                                    "value": `${infoPage.search.toLowerCase()}`
+                                },
+                                {
+                                    "property": "user.firstName",
+                                    "operator": "contains",
+                                    "value": `${infoPage.search.toLowerCase()}`
+                                },
+                                {
+                                    "property": "user.lastName",
+                                    "operator": "contains",
+                                    "value": `${infoPage.search.toLowerCase()}`
+                                },
+                                {
+                                    "property": "user.secondLastName",
+                                    "operator": "contains",
+                                    "value": `${infoPage.search.toLowerCase()}`
+                                },
+                                {
+                                    "property": "user.username",
+                                    "operator": "contains",
+                                    "value": `${infoPage.search.toLowerCase()}`
+                                },
+                                {
+                                    "property": "marcationState.name",
+                                    "operator": "contains",
+                                    "value": `${infoPage.search.toLowerCase()}`
+                                }
+                            ]
+                        },
+                        {
+                            "property": "customer.id",
+                            "operator": "=",
+                            "value": `${customerId}`
+                        },
+                        {
+                            "property": "ingressDate",
+                            "operator": "=",
+                            "value": `${infoPage.date}`
+                        }
+                    ]
+                },
+                sort: "-createdDate",
+                //limit: Config.tableRows,
+                //offset: infoPage.offset,
+                fetchPlan: 'full',
+            });
+        }
+        const assistControl = await getFilterEntityData("Marcation", raw);
+        dataPage = await calculateGestionMarcation(assistControl);
+        return dataPage;
     }
-    const assistControl = await getFilterEntityData("Marcation", raw);
-    dataPage = await calculateGestionMarcation(assistControl);
-    return dataPage;
+    if(Config.currentUser?.isMaster){
+        return response();
+    }else{
+        const permission = await getPermission('MARCATION_GESTION', Config.currentUser.id);
+        if(permission.code === 3){
+            infoPage.actions = permission.message.actionsText.split(';');
+            if(infoPage.actions.includes("READ")){
+                return response();
+            }else{
+                infoPage.msgPermission = "Usuario no tiene permiso de lectura.";
+                infoPage.count = 0;
+                return [];
+            }
+        }else{
+            infoPage.msgPermission = permission.message;
+            infoPage.count = 0;
+            return [];
+        }
+        
+    }
 };
 
 export class AssistGestion {
@@ -137,7 +171,7 @@ export class AssistGestion {
             let paginatedItems = assistControl.slice(start, end);
             // Show message if page is empty
             if (assistControl.length === 0) {
-                let mensaje = 'No existen datos';
+                let mensaje = `No existen datos. ${infoPage.msgPermission}`;
                 if(customerId == null){mensaje = 'Seleccione una empresa';}
                 let row = document.createElement('TR');
                 row.innerHTML = `
@@ -276,120 +310,127 @@ export class AssistGestion {
         this.export = () => {
             const exportNotes = document.getElementById('export-entities');
             exportNotes.addEventListener('click', async() => {
-                this.dialogContainer.style.display = 'block';
-                this.dialogContainer.innerHTML = `
-                    <div class="dialog_content" id="dialog-content">
-                        <div class="dialog">
-                            <div class="dialog_container padding_8">
-                                <div class="dialog_header">
-                                    <h2>Seleccionar la fecha</h2>
-                                </div>
-
-                                <div class="dialog_message padding_8">
-                                    <div class="form_group">
-                                        <div class="form_input">
-                                            <label class="form_label" for="start-date">Desde:</label>
-                                            <input type="date" class="input_date input_date-start" id="start-date" name="start-date">
-                                        </div>
-                        
-                                        <div class="form_input">
-                                            <label class="form_label" for="end-date">Hasta:</label>
-                                            <input type="date" class="input_date input_date-end" id="end-date" name="end-date">
-                                        </div>
-
-                                        <label for="exportCsv">
-                                            <input type="radio" id="exportCsv" name="exportOption" value="csv" /> CSV
-                                        </label>
-
-                                        <label for="exportXls">
-                                            <input type="radio" id="exportXls" name="exportOption" value="xls" checked /> XLS
-                                        </label>
-
-                                        <label for="exportPdf">
-                                            <input type="radio" id="exportPdf" name="exportOption" value="pdf" /> PDF
-                                        </label>
+                if(!infoPage.actions.includes("DWN") && !Config.currentUser?.isMaster){
+                    alert("Usuario no tiene permiso de exportar.");
+                }else{
+                    this.dialogContainer.style.display = 'block';
+                    this.dialogContainer.innerHTML = `
+                        <div class="dialog_content" id="dialog-content">
+                            <div class="dialog">
+                                <div class="dialog_container padding_8">
+                                    <div class="dialog_header">
+                                        <h2>Seleccionar la fecha</h2>
                                     </div>
-                                </div>
 
-                                <div class="dialog_footer">
-                                    <button class="btn btn_primary" id="cancel">Cancelar</button>
-                                    <button class="btn btn_danger" id="export-data">Exportar</button>
+                                    <div class="dialog_message padding_8">
+                                        <div class="form_group">
+                                            <div class="form_input">
+                                                <label class="form_label" for="start-date">Desde:</label>
+                                                <input type="date" class="input_date input_date-start" id="start-date" name="start-date">
+                                            </div>
+                            
+                                            <div class="form_input">
+                                                <label class="form_label" for="end-date">Hasta:</label>
+                                                <input type="date" class="input_date input_date-end" id="end-date" name="end-date">
+                                            </div>
+
+                                            <label for="exportCsv">
+                                                <input type="radio" id="exportCsv" name="exportOption" value="csv" /> CSV
+                                            </label>
+
+                                            <label for="exportXls">
+                                                <input type="radio" id="exportXls" name="exportOption" value="xls" checked /> XLS
+                                            </label>
+
+                                            <label for="exportPdf">
+                                                <input type="radio" id="exportPdf" name="exportOption" value="pdf" /> PDF
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    <div class="dialog_footer">
+                                        <button class="btn btn_primary" id="cancel">Cancelar</button>
+                                        <button class="btn btn_danger" id="export-data">Exportar</button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
-                `;
-                let fecha = new Date(); //Fecha actual
-                let mes = fecha.getMonth()+1; //obteniendo mes
-                let dia = fecha.getDate(); //obteniendo dia
-                let anio = fecha.getFullYear(); //obteniendo año
-                if(dia<10)
-                    dia='0'+dia; //agrega cero si el menor de 10
-                if(mes<10)
-                    mes='0'+mes //agrega cero si el menor de 10
+                    `;
+                    let fecha = new Date(); //Fecha actual
+                    let mes = fecha.getMonth()+1; //obteniendo mes
+                    let dia = fecha.getDate(); //obteniendo dia
+                    let anio = fecha.getFullYear(); //obteniendo año
+                    if(dia<10)
+                        dia='0'+dia; //agrega cero si el menor de 10
+                    if(mes<10)
+                        mes='0'+mes //agrega cero si el menor de 10
 
-                document.getElementById("start-date").value = anio+"-"+mes+"-"+dia;
-                document.getElementById("end-date").value = anio+"-"+mes+"-"+dia;
-                inputObserver();
-                const _closeButton = document.getElementById('cancel');
-                const exportButton = document.getElementById('export-data');
-                const _dialog = document.getElementById('dialog-content');
-                exportButton.addEventListener('click', async() => {
-                    const _values = {
-                        start: document.getElementById('start-date'),
-                        end: document.getElementById('end-date'),
-                        exportOption: document.getElementsByName('exportOption')
-                    }
-                    let rawExport = JSON.stringify({
-                        "filter": {
-                            "conditions": [
-                                {
-                                    "property": "customer.id",
-                                    "operator": "=",
-                                    "value": `${customerId}`
+                    document.getElementById("start-date").value = anio+"-"+mes+"-"+dia;
+                    document.getElementById("end-date").value = anio+"-"+mes+"-"+dia;
+                    inputObserver();
+                    const _closeButton = document.getElementById('cancel');
+                    const exportButton = document.getElementById('export-data');
+                    const _dialog = document.getElementById('dialog-content');
+                    exportButton.addEventListener('click', async() => {
+                        if(!infoPage.actions.includes("DWN") && !Config.currentUser?.isMaster){
+                            alert("Usuario no tiene permiso de exportar.");
+                        }else{
+                            const _values = {
+                                start: document.getElementById('start-date'),
+                                end: document.getElementById('end-date'),
+                                exportOption: document.getElementsByName('exportOption')
+                            }
+                            let rawExport = JSON.stringify({
+                                "filter": {
+                                    "conditions": [
+                                        {
+                                            "property": "customer.id",
+                                            "operator": "=",
+                                            "value": `${customerId}`
+                                        },
+                                        {
+                                            "property": "ingressDate",
+                                            "operator": ">=",
+                                            "value": `${_values.start.value}`
+                                        },
+                                        {
+                                            "property": "ingressDate",
+                                            "operator": "<=",
+                                            "value": `${_values.end.value}`
+                                        }
+                                    ],
                                 },
-                                {
-                                    "property": "ingressDate",
-                                    "operator": ">=",
-                                    "value": `${_values.start.value}`
-                                },
-                                {
-                                    "property": "ingressDate",
-                                    "operator": "<=",
-                                    "value": `${_values.end.value}`
-                                }
-                            ],
-                        },
-                        sort: "-createdDate",
-                        fetchPlan: 'full',
-                    });
-                    const dataRaw = await getFilterEntityData("Marcation", rawExport); //await GetAssistControl();
-                    const marcations = await calculateGestionMarcation(dataRaw);
-                    for (let i = 0; i < _values.exportOption.length; i++) {
-                        let ele = _values.exportOption[i];
-                        if (ele.type = "radio") {
-                            if (ele.checked) {
-                                if (ele.value == "xls") {
-                                    // @ts-ignore
-                                    exportMarcationsXls(marcations, _values.start.value, _values.end.value);
-                                }
-                                else if (ele.value == "csv") {
-                                    // @ts-ignore
-                                    exportMarcationsCsv(marcations, _values.start.value, _values.end.value);
-                                }
-                                else if (ele.value == "pdf") {
-                                    // @ts-ignore
-                                    exportMarcationsPdf(marcations, _values.start.value, _values.end.value);
+                                sort: "-createdDate",
+                                fetchPlan: 'full',
+                            });
+                            const dataRaw = await getFilterEntityData("Marcation", rawExport); //await GetAssistControl();
+                            const marcations = await calculateGestionMarcation(dataRaw);
+                            for (let i = 0; i < _values.exportOption.length; i++) {
+                                let ele = _values.exportOption[i];
+                                if (ele.type = "radio") {
+                                    if (ele.checked) {
+                                        if (ele.value == "xls") {
+                                            // @ts-ignore
+                                            exportMarcationsXls(marcations, _values.start.value, _values.end.value);
+                                        }
+                                        else if (ele.value == "csv") {
+                                            // @ts-ignore
+                                            exportMarcationsCsv(marcations, _values.start.value, _values.end.value);
+                                        }
+                                        else if (ele.value == "pdf") {
+                                            // @ts-ignore
+                                            exportMarcationsPdf(marcations, _values.start.value, _values.end.value);
+                                        }
+                                    }
                                 }
                             }
                         }
-                    }
-                    
-                    
-                });
-                _closeButton.onclick = () => {
-                    new CloseDialog().x(_dialog);
-                };
+                        
+                    });
+                    _closeButton.onclick = () => {
+                        new CloseDialog().x(_dialog);
+                    };
+                }
             });
         };
 

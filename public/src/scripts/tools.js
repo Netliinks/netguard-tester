@@ -1,4 +1,4 @@
-import { getEntitiesData, getUserInfo, getFilterEntityData, getEntityData, registerEntity, _userAgent } from "./endpoints.js";
+import { getEntitiesData, getUserInfo, getFilterEntityData, getFilterEntityCount, getEntityData, registerEntity, _userAgent } from "./endpoints.js";
 //
 export const inputObserver = () => {
     const inputs = document.querySelectorAll('input');
@@ -170,6 +170,11 @@ export const drawTagsIntoTables = () => {
             text === "pendiente" ||
             text === "PENDIENTE") {
             tag.classList.add("tag_yellow");
+        }
+        else if(text === "No cumplido"||
+            text === "no cumplido" ||
+            text === "NO CUMPLIDO"){
+            tag.classList.add("tag_red")
         }
         else {
             tag.classList.add('tag_gray');
@@ -624,4 +629,136 @@ export const searchUniversalSingle = async (param, operator, value, table) => {
     }else{
         return data;
     }
+}
+
+export const getRoutinesTopBar =async(id)=> {
+    const raw = JSON.stringify({
+        "filter": {
+            "conditions": [
+                {
+                    "property": "business.id",
+                    "operator": "=",
+                    "value": `${id}`
+                },
+                {
+                    "property": "routineState.name",
+                    "operator": "=",
+                    "value": `No cumplido`
+                }
+            ]
+        },
+        sort: "-createdDate",
+    });
+    return await getFilterEntityCount("RoutineRegister", raw);
+
+}
+
+export const getPermission =async(module, user)=> {
+    const raw = JSON.stringify({
+        "filter": {
+            "conditions": [
+                {
+                    "property": "business.state.name",
+                    "operator": "=",
+                    "value": `Enabled`
+                },
+                {
+                    "property": "customer.state.name",
+                    "operator": "=",
+                    "value": `Enabled`
+                },
+                {
+                    "property": "user.state.name",
+                    "operator": "=",
+                    "value": `Enabled`
+                },
+                {
+                    "property": "module.active",
+                    "operator": "=",
+                    "value": `${true}`
+                },
+                {
+                    "property": "module.name",
+                    "operator": "=",
+                    "value": `${module}`
+                },
+                {
+                    "property": "user.id",
+                    "operator": "=",
+                    "value": `${user}`
+                }
+            ]
+        }
+    });
+    const permission = await getFilterEntityData("Permission", raw);
+    if(permission === undefined){
+        return {
+            code: 1,
+            message: "No se pudo obtener el permiso"
+        };
+    }else if(permission.length === 0){
+        return {
+            code: 2,
+            message: "Usuario no tiene el permiso o módulo inactivo"
+        };
+    }else if(permission.length !== 0){
+        return {
+            code: 3,
+            message: permission[0]
+        };
+    }else{
+        return {
+            code: 4,
+            message: "Ocurrió un error al obtener el permiso"
+        };
+    }
+
+}
+
+export const getPermissions =async(user)=> {
+    const raw = JSON.stringify({
+        "filter": {
+            "conditions": [
+                {
+                    "property": "business.state.name",
+                    "operator": "=",
+                    "value": `Enabled`
+                },
+                {
+                    "property": "customer.state.name",
+                    "operator": "=",
+                    "value": `Enabled`
+                },
+                {
+                    "property": "user.id",
+                    "operator": "=",
+                    "value": `${user}`
+                }
+            ]
+        },
+        fetchPlan: 'full',
+    });
+    const permission = await getFilterEntityData("Permission", raw);
+    if(permission === undefined){
+        return {
+            code: 1,
+            message: "No se pudo obtener el permiso"
+        };
+    }else if(permission.length === 0){
+        return {
+            code: 2,
+            message: "Usuario no tiene el permiso o módulo inactivo"
+        };
+    }else if(permission.length !== 0){
+        return {
+            code: 3,
+            message: permission
+        };
+    }else{
+        return {
+            code: 4,
+            message: "Ocurrió un error al obtener el permiso"
+        };
+    }
+
 }

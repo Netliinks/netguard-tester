@@ -347,7 +347,7 @@ renders() {
 
     document.getElementById('render-routineDetails')?.addEventListener('click', () => {
       clearTimeout(Config.timeOut);
-      new RoutineRegisters().render(Config.offset, Config.currentPage, "", false);
+      new RoutineRegisters().render(Config.offset, Config.currentPage, "", false, 0);
     });
   }
 }

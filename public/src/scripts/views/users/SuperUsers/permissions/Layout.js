@@ -6,49 +6,44 @@
 export const tableLayout = `
   <div class="datatable" id="datatable">
     <div class="datatable_header">
-      <div class="datatable_title" id="datatable-title"><h1>Rutinas</h1></div>
+      <div class="datatable_title" id="datatable-title">
+        <h1>Permisos</h1>
+        <h2 id="datatable_subtitle" style="color:blue;">Cargando...</h2>
+      </div>
       <div class="datatable_tools" id="datatable-tools">
         <input type="search"
         class="search_input"
         placeholder="Buscar"
         id="search">
         <button
-          class="datatable_button add_user"
-          id="btnSearch">
-          <i class="fa-solid fa-search"></i>
-      </button>
+            class="datatable_button add_user"
+            id="btnSearch">
+            <i class="fa-solid fa-search"></i>
+        </button>
         <button
-          class="datatable_button add_user"
+          class="datatable_button add_location"
           id="new-entity">
           <i class="fa-solid fa-add"></i>
         </button>
       </div>
     </div>
-
     <table class="datatable_content">
       <thead><tr>
-        <th><span data-type="name">
-          Nombre <i class="fa-regular fa-filter"></i>
+        <th><span data-type="module">
+          Módulo <i class="fa-regular fa-filter"></i>
         </span></th>
-
-        <th><span data-type="active">
-          Activo <i class="fa-regular fa-filter"></i>
+        <th><span data-type="actions">
+          Acciones <i class="fa-regular fa-filter"></i>
         </span></th>
-
-        <th><span data-type="validateLocation">
-          Validar Ubicación <i class="fa-regular fa-filter"></i>
+        <th><span data-type="created">
+          Fecha <i class="fa-regular fa-filter"></i>
         </span></th>
-
         <th class="header_filled"></th>
-
       </tr></thead>
       <tbody id="datatable-body" class="datatable_body">
-
       </tbody>
     </table>
-
     </div>
-
     <div class="datatable_footer">
       <div class="datatable_pagination" id="pagination-container"></div>
     </div>`;

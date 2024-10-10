@@ -1,6 +1,6 @@
 // @filename: Departments.ts
 import { deleteEntity, getFilterEntityData, registerEntity, getFilterEntityCount } from "../../endpoints.js";
-import { inputObserver, inputSelect, CloseDialog, filterDataByHeaderType, pageNumbers, fillBtnPagination } from "../../tools.js";
+import { inputObserver, inputSelect, CloseDialog, filterDataByHeaderType, pageNumbers, fillBtnPagination, getPermission } from "../../tools.js";
 import { Config } from "../../Configs.js";
 import { tableLayout } from "./Layout.js";
 import { tableLayoutTemplate } from "./Template.js";
@@ -11,55 +11,79 @@ let infoPage = {
     count: 0,
     offset: Config.offset,
     currentPage: currentPage,
-    search: ""
+    search: "",
+    msgPermission: "",
+    actions: []
 };
 let dataPage;
 const getDepartments = async () => {
-    //const department = await getEntitiesData('Department');
-    //const FCustomer = department.filter((data) => `${data.customer?.id}` === `${customerId}`);
-    let raw = JSON.stringify({
-      "filter": {
-          "conditions": [
-              {
-                  "property": "customer.id",
-                  "operator": "=",
-                  "value": `${customerId}`
-              }
-          ],
-      },
-      sort: "-createdDate",
-      limit: Config.tableRows,
-      offset: infoPage.offset,
-  });
-  if (infoPage.search != "") {
-    raw = JSON.stringify({
-        "filter": {
-            "conditions": [
-                {
-                    "group": "OR",
+    const response = async () => {
+            //const department = await getEntitiesData('Department');
+            //const FCustomer = department.filter((data) => `${data.customer?.id}` === `${customerId}`);
+            let raw = JSON.stringify({
+            "filter": {
+                "conditions": [
+                    {
+                        "property": "customer.id",
+                        "operator": "=",
+                        "value": `${customerId}`
+                    }
+                ],
+            },
+            sort: "-createdDate",
+            limit: Config.tableRows,
+            offset: infoPage.offset,
+        });
+        if (infoPage.search != "") {
+            raw = JSON.stringify({
+                "filter": {
                     "conditions": [
                         {
-                            "property": "name",
-                            "operator": "contains",
-                            "value": `${infoPage.search.toLowerCase()}`
+                            "group": "OR",
+                            "conditions": [
+                                {
+                                    "property": "name",
+                                    "operator": "contains",
+                                    "value": `${infoPage.search.toLowerCase()}`
+                                }
+                            ]
+                        },
+                        {
+                            "property": "customer.id",
+                            "operator": "=",
+                            "value": `${customerId}`
                         }
                     ]
                 },
-                {
-                    "property": "customer.id",
-                    "operator": "=",
-                    "value": `${customerId}`
-                }
-            ]
-        },
-        sort: "-createdDate",
-        limit: Config.tableRows,
-        offset: infoPage.offset
-    });
-  }
-  infoPage.count = await getFilterEntityCount("Department", raw);
-  dataPage = await getFilterEntityData("Department", raw);
-  return dataPage;
+                sort: "-createdDate",
+                limit: Config.tableRows,
+                offset: infoPage.offset
+            });
+        }
+        infoPage.count = await getFilterEntityCount("Department", raw);
+        dataPage = await getFilterEntityData("Department", raw);
+        return dataPage;
+    }
+    if(Config.currentUser?.isMaster){
+        return response();
+    }else{
+        const permission = await getPermission('DEPARTMENT', Config.currentUser.id);
+        if(permission.code === 3){
+            infoPage.actions = permission.message.actionsText.split(';');
+            if(infoPage.actions.includes("READ")){
+                return response();
+            }else{
+                infoPage.msgPermission = "Usuario no tiene permiso de lectura.";
+                infoPage.count = 0;
+                return [];
+            }
+        }else{
+            infoPage.msgPermission = permission.message;
+            infoPage.count = 0;
+            return [];
+        }
+        
+    }
 };
 export class Departments {
     constructor() {
@@ -110,7 +134,7 @@ export class Departments {
         let end = start + tableRows;
         let paginatedItems = data.slice(start, end);
         if (data.length === 0) {
-            let mensaje = 'No existen datos';
+            let mensaje = `No existen datos. ${infoPage.msgPermission}`;
             if(customerId == null){mensaje = 'Seleccione una empresa';}
             let row = document.createElement('tr');
             row.innerHTML = `
@@ -202,7 +226,11 @@ export class Departments {
         // register entity
         const openEditor = document.getElementById('new-entity');
         openEditor.addEventListener('click', () => {
-            renderInterface();
+            if(infoPage.actions.includes("INS") || Config.currentUser?.isMaster){
+                renderInterface();
+            }else{
+                alert("Usuario no tiene permiso de registrar.");
+            }
         });
         const renderInterface = async () => {
             this.entityDialogContainer.innerHTML = '';
@@ -247,22 +275,26 @@ export class Departments {
             this.close();
             const registerButton = document.getElementById('register-entity');
             registerButton.addEventListener('click', () => {
-                const inputsCollection = {
-                    name: document.getElementById('entity-name'),
-                    //customer: document.getElementById('entity-customer'),
-                };
-                const raw = JSON.stringify({
-                    "name": `${inputsCollection.name.value}`,
-                    "customer": {
-                        "id": `${customerId}`
-                    }
-                });
-                registerEntity(raw, 'Department');
-                setTimeout(() => {
-                    const container = document.getElementById('entity-editor-container');
-                    new CloseDialog().x(container);
-                    new Departments().render(Config.offset, Config.currentPage, infoPage.search);
-                }, 1000);
+                if(!infoPage.actions.includes("INS") && !Config.currentUser?.isMaster){
+                    alert("Usuario no tiene permiso de registrar.");
+                }else{
+                    const inputsCollection = {
+                        name: document.getElementById('entity-name'),
+                        //customer: document.getElementById('entity-customer'),
+                    };
+                    const raw = JSON.stringify({
+                        "name": `${inputsCollection.name.value}`,
+                        "customer": {
+                            "id": `${customerId}`
+                        }
+                    });
+                    registerEntity(raw, 'Department');
+                    setTimeout(() => {
+                        const container = document.getElementById('entity-editor-container');
+                        new CloseDialog().x(container);
+                        new Departments().render(Config.offset, Config.currentPage, infoPage.search);
+                    }, 1000);
+                }
             });
         };
         const reg = async (raw) => {
@@ -273,41 +305,49 @@ export class Departments {
         remove.forEach((remove) => {
             const entityId = remove.dataset.entityid;
             remove.addEventListener('click', () => {
+                if(!infoPage.actions.includes("DLT") && !Config.currentUser?.isMaster){
+                    alert("Usuario no tiene permiso de eliminar.");
+                }else{
                 this.dialogContainer.style.display = 'flex';
-                this.dialogContainer.innerHTML = `
-          <div class="dialog_content" id="dialog-content">
-            <div class="dialog dialog_danger">
-              <div class="dialog_container">
-                <div class="dialog_header">
-                  <h2>¿Deseas eliminar este departamento?</h2>
-                </div>
+                    this.dialogContainer.innerHTML = `
+            <div class="dialog_content" id="dialog-content">
+                <div class="dialog dialog_danger">
+                <div class="dialog_container">
+                    <div class="dialog_header">
+                    <h2>¿Deseas eliminar este departamento?</h2>
+                    </div>
 
-                <div class="dialog_message">
-                  <p>Esta acción no se puede revertir</p>
-                </div>
+                    <div class="dialog_message">
+                    <p>Esta acción no se puede revertir</p>
+                    </div>
 
-                <div class="dialog_footer">
-                  <button class="btn btn_primary" id="cancel">Cancelar</button>
-                  <button class="btn btn_danger" id="delete">Eliminar</button>
+                    <div class="dialog_footer">
+                    <button class="btn btn_primary" id="cancel">Cancelar</button>
+                    <button class="btn btn_danger" id="delete">Eliminar</button>
+                    </div>
                 </div>
-              </div>
+                </div>
             </div>
-          </div>
-        `;
-                // delete button
-                // cancel button
-                // dialog content
-                const deleteButton = document.getElementById('delete');
-                const cancelButton = document.getElementById('cancel');
-                const dialogContent = document.getElementById('dialog-content');
-                deleteButton.onclick = () => {
-                    deleteEntity('Department', entityId)
-                        .then(res => new Departments().render(infoPage.offset, infoPage.currentPage, infoPage.search));
-                    new CloseDialog().x(dialogContent);
-                };
-                cancelButton.onclick = () => {
-                    new CloseDialog().x(dialogContent);
-                };
+            `;
+                    // delete button
+                    // cancel button
+                    // dialog content
+                    const deleteButton = document.getElementById('delete');
+                    const cancelButton = document.getElementById('cancel');
+                    const dialogContent = document.getElementById('dialog-content');
+                    deleteButton.onclick = () => {
+                        if(!infoPage.actions.includes("DLT") && !Config.currentUser?.isMaster){
+                            alert("Usuario no tiene permiso de eliminar.");
+                        }else{
+                            deleteEntity('Department', entityId)
+                                .then(res => new Departments().render(infoPage.offset, infoPage.currentPage, infoPage.search));
+                            new CloseDialog().x(dialogContent);
+                        }
+                    };
+                    cancelButton.onclick = () => {
+                        new CloseDialog().x(dialogContent);
+                    };
+                }
             });
         });
     }

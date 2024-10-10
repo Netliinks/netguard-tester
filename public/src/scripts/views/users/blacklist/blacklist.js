@@ -1,6 +1,6 @@
 // @filename: Blacklist.ts
 import { deleteEntity, getEntityData, registerEntity, updateEntity, getFilterEntityData, getFilterEntityCount } from "../../../endpoints.js";
-import { drawTagsIntoTables, inputObserver, inputSelect, CloseDialog, filterDataByHeaderType, pageNumbers, fillBtnPagination } from "../../../tools.js";
+import { drawTagsIntoTables, inputObserver, inputSelect, CloseDialog, filterDataByHeaderType, pageNumbers, fillBtnPagination, getPermission } from "../../../tools.js";
 import { Config } from "../../../Configs.js";
 import { tableLayout } from "./Layout.js";
 import { tableLayoutTemplate } from "./Templates.js";
@@ -12,72 +12,96 @@ let infoPage = {
     count: 0,
     offset: Config.offset,
     currentPage: currentPage,
-    search: ""
+    search: "",
+    msgPermission: "",
+    actions: []
 };
 let dataPage;
 const getUsers = async () => {
-    //const users = await getEntitiesData('BlacklistedUser');
-    //const FCustomer = users.filter((data) => `${data.customer?.id}` === `${customerId}`);
-    let raw = JSON.stringify({
-        "filter": {
-            "conditions": [
-                {
-                    "property": "customer.id",
-                    "operator": "=",
-                    "value": `${customerId}`
-                }
-            ],
-        },
-        sort: "-createdDate",
-        limit: Config.tableRows,
-        offset: infoPage.offset,
-        fetchPlan: 'full',
-    });
-    if (infoPage.search != "") {
-        raw = JSON.stringify({
+    const response = async () => {
+        //const users = await getEntitiesData('BlacklistedUser');
+        //const FCustomer = users.filter((data) => `${data.customer?.id}` === `${customerId}`);
+        let raw = JSON.stringify({
             "filter": {
                 "conditions": [
-                    {
-                        "group": "OR",
-                        "conditions": [
-                            {
-                                "property": "dni",
-                                "operator": "contains",
-                                "value": `${infoPage.search.toLowerCase()}`
-                            },
-                            {
-                                "property": "firstName",
-                                "operator": "contains",
-                                "value": `${infoPage.search.toLowerCase()}`
-                            },
-                            {
-                                "property": "firstLastName",
-                                "operator": "contains",
-                                "value": `${infoPage.search.toLowerCase()}`
-                            },
-                            {
-                                "property": "secondLastName",
-                                "operator": "contains",
-                                "value": `${infoPage.search.toLowerCase()}`
-                            }
-                        ]
-                    },
                     {
                         "property": "customer.id",
                         "operator": "=",
                         "value": `${customerId}`
                     }
-                ]
+                ],
             },
             sort: "-createdDate",
             limit: Config.tableRows,
             offset: infoPage.offset,
             fetchPlan: 'full',
         });
+        if (infoPage.search != "") {
+            raw = JSON.stringify({
+                "filter": {
+                    "conditions": [
+                        {
+                            "group": "OR",
+                            "conditions": [
+                                {
+                                    "property": "dni",
+                                    "operator": "contains",
+                                    "value": `${infoPage.search.toLowerCase()}`
+                                },
+                                {
+                                    "property": "firstName",
+                                    "operator": "contains",
+                                    "value": `${infoPage.search.toLowerCase()}`
+                                },
+                                {
+                                    "property": "firstLastName",
+                                    "operator": "contains",
+                                    "value": `${infoPage.search.toLowerCase()}`
+                                },
+                                {
+                                    "property": "secondLastName",
+                                    "operator": "contains",
+                                    "value": `${infoPage.search.toLowerCase()}`
+                                }
+                            ]
+                        },
+                        {
+                            "property": "customer.id",
+                            "operator": "=",
+                            "value": `${customerId}`
+                        }
+                    ]
+                },
+                sort: "-createdDate",
+                limit: Config.tableRows,
+                offset: infoPage.offset,
+                fetchPlan: 'full',
+            });
+        }
+        infoPage.count = await getFilterEntityCount("BlacklistedUser", raw);
+        dataPage = await getFilterEntityData("BlacklistedUser", raw);
+        return dataPage;
     }
-    infoPage.count = await getFilterEntityCount("BlacklistedUser", raw);
-    dataPage = await getFilterEntityData("BlacklistedUser", raw);
-    return dataPage;
+    if(Config.currentUser?.isMaster){
+        return response();
+    }else{
+        const permission = await getPermission('USER_BLACKLIST', Config.currentUser.id);
+        if(permission.code === 3){
+            infoPage.actions = permission.message.actionsText.split(';');
+            if(infoPage.actions.includes("READ")){
+                return response();
+            }else{
+                infoPage.msgPermission = "Usuario no tiene permiso de lectura.";
+                infoPage.count = 0;
+                return [];
+            }
+        }else{
+            infoPage.msgPermission = permission.message;
+            infoPage.count = 0;
+            return [];
+        }
+        
+    }
 };
 export class Blacklist {
     constructor() {
@@ -129,7 +153,7 @@ export class Blacklist {
         let end = start + tableRows;
         let paginatedItems = data.slice(start, end);
         if (data.length === 0) {
-            let mensaje = 'No existen datos';
+            let mensaje = `No existen datos. ${infoPage.msgPermission}`;
             if(customerId == null){mensaje = 'Seleccione una empresa';}
             let row = document.createElement('tr');
             row.innerHTML = `
@@ -172,7 +196,11 @@ export class Blacklist {
         // register entity
         const openEditor = document.getElementById('new-entity');
         openEditor.addEventListener('click', () => {
-            renderInterface('User');
+            if(infoPage.actions.includes("INS") || Config.currentUser?.isMaster){
+                renderInterface('User');
+            }else{
+                alert("Usuario no tiene permiso de registrar.");
+            }
         });
         const renderInterface = async (entities) => {
             this.entityDialogContainer.innerHTML = '';
@@ -225,36 +253,40 @@ export class Blacklist {
             this.close();
             const registerButton = document.getElementById('register-entity');
             registerButton.addEventListener('click', async () => {
-                let _values;
-                _values = {
-                    firstName: document.getElementById('entity-firstname'),
-                    firstLastName: document.getElementById('entity-firstLastName'),
-                    secondLastName: document.getElementById('entity-secondlastname'),
-                    dni: document.getElementById('entity-dni'),
-                };
-                const blackuserRaw = JSON.stringify({
-                    "firstLastName": `${_values.firstLastName.value}`,
-                    "secondLastName": `${_values.secondLastName.value}`,
-                    "firstName": `${_values.firstName.value}`,
-                    "customer": {
-                        "id": `${customerId}`
-                    },
-                    "dni": `${_values.dni.value}`
-                });
-                if (_values.firstName.value === '' || _values.firstName.value === undefined) {
-                    alert("¡Nombre vacío!");
-                }
-                else if (_values.firstLastName.value === '' || _values.firstLastName.value === undefined) {
-                    alert("¡Primer apellido vacío!");
-                }
-                else if (_values.secondLastName.value === '' || _values.secondLastName.value === undefined) {
-                    alert("¡Segundo apellido vacío!");
-                }
-                else if (_values.dni.value === '' || _values.dni.value === undefined) {
-                    alert("DNI vacío!");
-                }
-                else {
-                    reg(blackuserRaw);
+                if(!infoPage.actions.includes("INS") && !Config.currentUser?.isMaster){
+                    alert("Usuario no tiene permiso de registrar.");
+                }else{
+                    let _values;
+                    _values = {
+                        firstName: document.getElementById('entity-firstname'),
+                        firstLastName: document.getElementById('entity-firstLastName'),
+                        secondLastName: document.getElementById('entity-secondlastname'),
+                        dni: document.getElementById('entity-dni'),
+                    };
+                    const blackuserRaw = JSON.stringify({
+                        "firstLastName": `${_values.firstLastName.value}`,
+                        "secondLastName": `${_values.secondLastName.value}`,
+                        "firstName": `${_values.firstName.value}`,
+                        "customer": {
+                            "id": `${customerId}`
+                        },
+                        "dni": `${_values.dni.value}`
+                    });
+                    if (_values.firstName.value === '' || _values.firstName.value === undefined) {
+                        alert("¡Nombre vacío!");
+                    }
+                    else if (_values.firstLastName.value === '' || _values.firstLastName.value === undefined) {
+                        alert("¡Primer apellido vacío!");
+                    }
+                    else if (_values.secondLastName.value === '' || _values.secondLastName.value === undefined) {
+                        alert("¡Segundo apellido vacío!");
+                    }
+                    else if (_values.dni.value === '' || _values.dni.value === undefined) {
+                        alert("DNI vacío!");
+                    }
+                    else {
+                        reg(blackuserRaw);
+                    }
                 }
             });
         };
@@ -352,7 +384,12 @@ export class Blacklist {
                     "firstName": `${_values.firstName.value}`,
                     "dni": `${_values.dni.value}`,
                 });
-                update(blackuserRaw);
+                if(!infoPage.actions.includes("UPD") && !Config.currentUser?.isMaster){
+                    alert("Usuario no tiene permiso de actualizar.");
+                }else{
+                    update(blackuserRaw);
+                }
+                
             });
             /**
              * Update entity and execute functions to finish defying user
@@ -380,210 +417,234 @@ export class Blacklist {
         remove.forEach((remove) => {
             const entityId = remove.dataset.entityid;
             remove.addEventListener('click', () => {
-                this.dialogContainer.style.display = 'block';
-                this.dialogContainer.innerHTML = `
-          <div class="dialog_content" id="dialog-content">
-            <div class="dialog dialog_danger">
-              <div class="dialog_container">
-                <div class="dialog_header">
-                  <h2>¿Deseas eliminar esta persona?</h2>
-                </div>
+                if(!infoPage.actions.includes("DLT") && !Config.currentUser?.isMaster){
+                    alert("Usuario no tiene permiso de eliminar.");
+                }else{
+                    this.dialogContainer.style.display = 'block';
+                    this.dialogContainer.innerHTML = `
+            <div class="dialog_content" id="dialog-content">
+                <div class="dialog dialog_danger">
+                <div class="dialog_container">
+                    <div class="dialog_header">
+                    <h2>¿Deseas eliminar esta persona?</h2>
+                    </div>
 
-                <div class="dialog_message">
-                  <p>Esta acción no se puede revertir</p>
-                </div>
+                    <div class="dialog_message">
+                    <p>Esta acción no se puede revertir</p>
+                    </div>
 
-                <div class="dialog_footer">
-                  <button class="btn btn_primary" id="cancel">Cancelar</button>
-                  <button class="btn btn_danger" id="delete">Eliminar</button>
+                    <div class="dialog_footer">
+                    <button class="btn btn_primary" id="cancel">Cancelar</button>
+                    <button class="btn btn_danger" id="delete">Eliminar</button>
+                    </div>
                 </div>
-              </div>
+                </div>
             </div>
-          </div>
-        `;
-                // delete button
-                // cancel button
-                // dialog content
-                const deleteButton = document.getElementById('delete');
-                const cancelButton = document.getElementById('cancel');
-                const dialogContent = document.getElementById('dialog-content');
-                deleteButton.onclick = () => {
-                    deleteEntity('BlacklistedUser', entityId)
-                    .then((res) => {
-                        setTimeout(async () => {
-                            //let data = await getUsers();
-                            const tableBody = document.getElementById('datatable-body');
-                            new CloseDialog().x(dialogContent);
-                            new Blacklist().render(infoPage.offset, infoPage.currentPage, infoPage.search);
-                        }, 1000);
-                    });
-                };
-                cancelButton.onclick = () => {
-                    new CloseDialog().x(dialogContent);
-                    //this.render();
-                };
+            `;
+                    // delete button
+                    // cancel button
+                    // dialog content
+                    const deleteButton = document.getElementById('delete');
+                    const cancelButton = document.getElementById('cancel');
+                    const dialogContent = document.getElementById('dialog-content');
+                    deleteButton.onclick = () => {
+                        if(!infoPage.actions.includes("DLT") && !Config.currentUser?.isMaster){
+                            alert("Usuario no tiene permiso de eliminar.");
+                        }else{
+                            deleteEntity('BlacklistedUser', entityId)
+                            .then((res) => {
+                                setTimeout(async () => {
+                                    //let data = await getUsers();
+                                    const tableBody = document.getElementById('datatable-body');
+                                    new CloseDialog().x(dialogContent);
+                                    new Blacklist().render(infoPage.offset, infoPage.currentPage, infoPage.search);
+                                }, 1000);
+                            });
+                        }
+                    };
+                    cancelButton.onclick = () => {
+                        new CloseDialog().x(dialogContent);
+                        //this.render();
+                    };
+                }
             });
         });
     }
     import = () => {
         const _importContractors = document.getElementById('import-entities');
         _importContractors.addEventListener('click', () => {
-            this.entityDialogContainer.innerHTML = '';
-            this.entityDialogContainer.style.display = 'flex';
-            this.entityDialogContainer.innerHTML = `
-                    <div class="entity_editor id="entity-editor">
-                        <div class="entity_editor_header">
-                            <div class="user_info">
-                                <div class="avatar">
-                                    <i class="fa-regular fa-up-from-line"></i>
+            if(!infoPage.actions.includes("INS") && !Config.currentUser?.isMaster){
+                alert("Usuario no tiene permiso de registrar.");
+            }else{
+                this.entityDialogContainer.innerHTML = '';
+                this.entityDialogContainer.style.display = 'flex';
+                this.entityDialogContainer.innerHTML = `
+                        <div class="entity_editor id="entity-editor">
+                            <div class="entity_editor_header">
+                                <div class="user_info">
+                                    <div class="avatar">
+                                        <i class="fa-regular fa-up-from-line"></i>
+                                    </div>
+                                    <h1 class="entity_editor_title">Importar <br> <small>Persona</small></h1>
                                 </div>
-                                <h1 class="entity_editor_title">Importar <br> <small>Persona</small></h1>
+                                <button class="btn btn_close_editor" id="close"><i class="fa-solid fa-x"></i></button>
                             </div>
-                            <button class="btn btn_close_editor" id="close"><i class="fa-solid fa-x"></i></button>
-                        </div>
-                        <!--EDITOR BODY -->
-                        <div class="entity_editor_body padding_t_8_important">
-                            <div class="sidebar_section">
-                                <div class="file_template">
-                                    <i class="fa-solid fa-file-csv"></i>
-                                    <div class="description">
-                                        <p class="filename">Plantilla de Lista Negra</p>
-                                        <a href="./public/src/templates/NetguardBlackList.csv" download="./public/src/templates/NetguardBlackList.csv" rel="noopener" target="_self" class="filelink">Descargar</a>
+                            <!--EDITOR BODY -->
+                            <div class="entity_editor_body padding_t_8_important">
+                                <div class="sidebar_section">
+                                    <div class="file_template">
+                                        <i class="fa-solid fa-file-csv"></i>
+                                        <div class="description">
+                                            <p class="filename">Plantilla de Lista Negra</p>
+                                            <a href="./public/src/templates/NetguardBlackList.csv" download="./public/src/templates/NetguardBlackList.csv" rel="noopener" target="_self" class="filelink">Descargar</a>
+                                        </div>
                                     </div>
                                 </div>
+                                <div class="sidebar_section">
+                                    <input type="file" id="file-handler">
+                                </div>
                             </div>
-                            <div class="sidebar_section">
-                                <input type="file" id="file-handler">
+                            <div class="entity_editor_footer">
+                                <button class="btn btn_primary btn_widder" id="button-import">Importar<button>
                             </div>
                         </div>
-                        <div class="entity_editor_footer">
-                            <button class="btn btn_primary btn_widder" id="button-import">Importar<button>
-                        </div>
-                    </div>
-                `;
-            this.close();
-            const _fileHandler = document.getElementById('file-handler');
-            _fileHandler.addEventListener('change', () => {
-                readFile(_fileHandler.files[0]);
-            });
-            async function readFile(file) {
-                const fileReader = new FileReader();
-                fileReader.readAsText(file);
-                fileReader.addEventListener('load', (e) => {
-                    let result = e.srcElement.result;
-                    let resultSplit = result.split('\r');
-                    let rawFile;
-                    let stageUsers = [];
-                    for (let i = 1; i < resultSplit.length; i++) {
-                        let blackListData = resultSplit[i].split(';');
-                        rawFile = JSON.stringify({
-                            "firstName": `${blackListData[0]?.replace(/\n/g, '')}`,
-                            "firstLastName": `${blackListData[1]?.replace(/\n/g, '')}`,
-                            "secondLastName": `${blackListData[2]?.replace(/\n/g, '')}`,
-                            "dni": `${blackListData[3]?.replace(/\n/g, '')}`,
-                        });
-                        stageUsers.push(rawFile);
-                    }
-                    const _import = document.getElementById('button-import');
-                    _import.addEventListener('click', () => {
-                        stageUsers.forEach((user) => {
-                            registerEntity(user, 'BlacklistedUser')
-                                .then((res) => {
-                                setTimeout(async () => {
-                                    //let data = await getUsers();
-                                    const tableBody = document.getElementById('datatable-body');
-                                    const container = document.getElementById('entity-editor-container');
-                                    new CloseDialog().x(container);
-                                    new Blacklist().render(Config.offset, Config.currentPage, '');
-                                }, 1000);
+                    `;
+                this.close();
+                const _fileHandler = document.getElementById('file-handler');
+                _fileHandler.addEventListener('change', () => {
+                    readFile(_fileHandler.files[0]);
+                });
+                async function readFile(file) {
+                    const fileReader = new FileReader();
+                    fileReader.readAsText(file);
+                    fileReader.addEventListener('load', (e) => {
+                        let result = e.srcElement.result;
+                        let resultSplit = result.split('\r');
+                        let rawFile;
+                        let stageUsers = [];
+                        for (let i = 1; i < resultSplit.length; i++) {
+                            let blackListData = resultSplit[i].split(';');
+                            rawFile = JSON.stringify({
+                                "firstName": `${blackListData[0]?.replace(/\n/g, '')}`,
+                                "firstLastName": `${blackListData[1]?.replace(/\n/g, '')}`,
+                                "secondLastName": `${blackListData[2]?.replace(/\n/g, '')}`,
+                                "dni": `${blackListData[3]?.replace(/\n/g, '')}`,
                             });
+                            stageUsers.push(rawFile);
+                        }
+                        const _import = document.getElementById('button-import');
+                        _import.addEventListener('click', () => {
+                            if(!infoPage.actions.includes("INS") && !Config.currentUser?.isMaster){
+                                alert("Usuario no tiene permiso de registrar.");
+                            }else{
+                                stageUsers.forEach((user) => {
+                                    registerEntity(user, 'BlacklistedUser')
+                                        .then((res) => {
+                                        setTimeout(async () => {
+                                            //let data = await getUsers();
+                                            const tableBody = document.getElementById('datatable-body');
+                                            const container = document.getElementById('entity-editor-container');
+                                            new CloseDialog().x(container);
+                                            new Blacklist().render(Config.offset, Config.currentPage, '');
+                                        }, 1000);
+                                    });
+                                });
+                            }
                         });
                     });
-                });
+                }
             }
         });
     }
     export = () => {
         const exportUsers = document.getElementById('export-entities');
         exportUsers.addEventListener('click', async () => {
-            this.dialogContainer.style.display = 'block';
-                this.dialogContainer.innerHTML = `
-                <div class="dialog_content" id="dialog-content">
-                    <div class="dialog">
-                        <div class="dialog_container padding_8">
-                            <div class="dialog_header">
-                                <h2>Seleccione un tipo</h2>
-                            </div>
-
-                            <div class="dialog_message padding_8">
-                                <div class="form_group">
-                                    <label for="exportCsv">
-                                        <input type="radio" id="exportCsv" name="exportOption" value="csv" /> CSV
-                                    </label>
-
-                                    <label for="exportXls">
-                                        <input type="radio" id="exportXls" name="exportOption" value="xls" checked /> XLS
-                                    </label>
-
-                                    <label for="exportPdf">
-                                        <input type="radio" id="exportPdf" name="exportOption" value="pdf" /> PDF
-                                    </label>
+            if(!infoPage.actions.includes("DWN") && !Config.currentUser?.isMaster){
+                alert("Usuario no tiene permiso de exportar.");
+            }else{
+                this.dialogContainer.style.display = 'block';
+                    this.dialogContainer.innerHTML = `
+                    <div class="dialog_content" id="dialog-content">
+                        <div class="dialog">
+                            <div class="dialog_container padding_8">
+                                <div class="dialog_header">
+                                    <h2>Seleccione un tipo</h2>
                                 </div>
-                            </div>
 
-                            <div class="dialog_footer">
-                                <button class="btn btn_primary" id="cancel">Cancelar</button>
-                                <button class="btn btn_danger" id="export-data">Exportar</button>
+                                <div class="dialog_message padding_8">
+                                    <div class="form_group">
+                                        <label for="exportCsv">
+                                            <input type="radio" id="exportCsv" name="exportOption" value="csv" /> CSV
+                                        </label>
+
+                                        <label for="exportXls">
+                                            <input type="radio" id="exportXls" name="exportOption" value="xls" checked /> XLS
+                                        </label>
+
+                                        <label for="exportPdf">
+                                            <input type="radio" id="exportPdf" name="exportOption" value="pdf" /> PDF
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div class="dialog_footer">
+                                    <button class="btn btn_primary" id="cancel">Cancelar</button>
+                                    <button class="btn btn_danger" id="export-data">Exportar</button>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
-            `;
-                inputObserver();
-                const _closeButton = document.getElementById('cancel');
-                const exportButton = document.getElementById('export-data');
-                const _dialog = document.getElementById('dialog-content');
-                exportButton.addEventListener('click', async () => {
-                    const _values = {
-                        exportOption: document.getElementsByName('exportOption')
-                    };
-                    let rawExport = JSON.stringify({
-                        "filter": {
-                            "conditions": [
-                                {
-                                    "property": "customer.id",
-                                    "operator": "=",
-                                    "value": `${customerId}`
-                                }
-                            ],
-                        },
-                        sort: "-createdDate",
-                        fetchPlan: 'full',
-                    });
-                    const users = await getFilterEntityData("BlacklistedUser", rawExport); //await getUsers();
-                    for (let i = 0; i < _values.exportOption.length; i++) {
-                        let ele = _values.exportOption[i];
-                        if (ele.type = "radio") {
-                            if (ele.checked) {
-                                if (ele.value == "xls") {
-                                    // @ts-ignore
-                                    exportBlackListXls(users);
-                                }
-                                else if (ele.value == "csv") {
-                                    // @ts-ignore
-                                    exportBlackListCsv(users);
-                                }
-                                else if (ele.value == "pdf") {
-                                    // @ts-ignore
-                                    exportBlackListPdf(users);
+                `;
+                    inputObserver();
+                    const _closeButton = document.getElementById('cancel');
+                    const exportButton = document.getElementById('export-data');
+                    const _dialog = document.getElementById('dialog-content');
+                    exportButton.addEventListener('click', async () => {
+                        if(!infoPage.actions.includes("DWN") && !Config.currentUser?.isMaster){
+                            alert("Usuario no tiene permiso de exportar.");
+                        }else{
+                            const _values = {
+                                exportOption: document.getElementsByName('exportOption')
+                            };
+                            let rawExport = JSON.stringify({
+                                "filter": {
+                                    "conditions": [
+                                        {
+                                            "property": "customer.id",
+                                            "operator": "=",
+                                            "value": `${customerId}`
+                                        }
+                                    ],
+                                },
+                                sort: "-createdDate",
+                                fetchPlan: 'full',
+                            });
+                            const users = await getFilterEntityData("BlacklistedUser", rawExport); //await getUsers();
+                            for (let i = 0; i < _values.exportOption.length; i++) {
+                                let ele = _values.exportOption[i];
+                                if (ele.type = "radio") {
+                                    if (ele.checked) {
+                                        if (ele.value == "xls") {
+                                            // @ts-ignore
+                                            exportBlackListXls(users);
+                                        }
+                                        else if (ele.value == "csv") {
+                                            // @ts-ignore
+                                            exportBlackListCsv(users);
+                                        }
+                                        else if (ele.value == "pdf") {
+                                            // @ts-ignore
+                                            exportBlackListPdf(users);
+                                        }
+                                    }
                                 }
                             }
                         }
-                    }
-                });
-                _closeButton.onclick = () => {
-                    new CloseDialog().x(_dialog);
-                };
+                    });
+                    _closeButton.onclick = () => {
+                        new CloseDialog().x(_dialog);
+                    };
+            }
         });
     };
     pagination(items, limitRows, currentPage) {

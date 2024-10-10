@@ -1,6 +1,6 @@
 // @filename: Contractors.ts
 import { deleteEntity, getEntityData, registerEntity, setPassword, setUserRole, updateEntity, getUserInfo, getFilterEntityData, getFilterEntityCount } from "../../../endpoints.js";
-import { drawTagsIntoTables, inputObserver, inputSelect, CloseDialog, getVerifyEmail, filterDataByHeaderType, getVerifyUsername, pageNumbers, fillBtnPagination } from "../../../tools.js";
+import { drawTagsIntoTables, inputObserver, inputSelect, CloseDialog, getVerifyEmail, filterDataByHeaderType, getVerifyUsername, pageNumbers, fillBtnPagination, getPermission } from "../../../tools.js";
 import { Config } from "../../../Configs.js";
 import { tableLayout } from "./Layout.js";
 import { tableLayoutTemplate } from "./Templates.js";
@@ -14,14 +14,16 @@ let infoPage = {
     count: 0,
     offset: Config.offset,
     currentPage: currentPage,
-    search: ""
+    search: "",
+    msgPermission: "",
+    actions: []
 };
 let dataPage;
 const currentUserData = async() => {
-    const currentUser = await getUserInfo();
-    const user = await getEntityData('User', `${currentUser.attributes.id}`);
-    currentUserInfo = user;
-    return user;
+    //const currentUser = await getUserInfo();
+    //const user = await getEntityData('User', `${currentUser.attributes.id}`);
+    currentUserInfo = Config.currentUser;
+    return Config.currentUser;
 }
 const currentCustomerData = async() => {
     const customer = await getEntityData('Customer', `${customerId}`);
@@ -29,75 +31,15 @@ const currentCustomerData = async() => {
 }
 const getUsers = async () => {
     const currentUser = await currentUserData(); //usuario logueado
-    currentCustomer = await currentCustomerData();
-    //const users = await getEntitiesData('User');
-    //const FSuper = users.filter((data) => data.isSuper === false);
-    //const FCustomer = FSuper.filter((data) => `${data.customer?.id}` === `${customerId}`);
-    //const data = FCustomer.filter((data) => `${data.userType}`.includes('CONTRACTOR'));
-    let raw = JSON.stringify({
-        "filter": {
-            "conditions": [
-                {
-                    "property": "customer.id",
-                    "operator": "=",
-                    "value": `${customerId}`
-                },
-                {
-                    "property": "isSuper",
-                    "operator": "=",
-                    "value": `${false}`
-                },
-                {
-                    "property": "userType",
-                    "operator": "=",
-                    "value": `CONTRACTOR`
-                }
-            ],
-        },
-        sort: "-createdDate",
-        limit: Config.tableRows,
-        offset: infoPage.offset,
-        fetchPlan: 'full',
-    });
-    if (infoPage.search != "") {
-        raw = JSON.stringify({
+    const response = async () => {
+        currentCustomer = await currentCustomerData();
+        //const users = await getEntitiesData('User');
+        //const FSuper = users.filter((data) => data.isSuper === false);
+        //const FCustomer = FSuper.filter((data) => `${data.customer?.id}` === `${customerId}`);
+        //const data = FCustomer.filter((data) => `${data.userType}`.includes('CONTRACTOR'));
+        let raw = JSON.stringify({
             "filter": {
                 "conditions": [
-                    {
-                        "group": "OR",
-                        "conditions": [
-                            {
-                                "property": "dni",
-                                "operator": "contains",
-                                "value": `${infoPage.search.toLowerCase()}`
-                            },
-                            {
-                                "property": "firstName",
-                                "operator": "contains",
-                                "value": `${infoPage.search.toLowerCase()}`
-                            },
-                            {
-                                "property": "lastName",
-                                "operator": "contains",
-                                "value": `${infoPage.search.toLowerCase()}`
-                            },
-                            {
-                                "property": "secondLastName",
-                                "operator": "contains",
-                                "value": `${infoPage.search.toLowerCase()}`
-                            },
-                            {
-                                "property": "username",
-                                "operator": "contains",
-                                "value": `${infoPage.search.toLowerCase()}`
-                            },
-                            {
-                                "property": "email",
-                                "operator": "contains",
-                                "value": `${infoPage.search.toLowerCase()}`
-                            }
-                        ]
-                    },
                     {
                         "property": "customer.id",
                         "operator": "=",
@@ -113,17 +55,98 @@ const getUsers = async () => {
                         "operator": "=",
                         "value": `CONTRACTOR`
                     }
-                ]
+                ],
             },
             sort: "-createdDate",
             limit: Config.tableRows,
             offset: infoPage.offset,
             fetchPlan: 'full',
         });
+        if (infoPage.search != "") {
+            raw = JSON.stringify({
+                "filter": {
+                    "conditions": [
+                        {
+                            "group": "OR",
+                            "conditions": [
+                                {
+                                    "property": "dni",
+                                    "operator": "contains",
+                                    "value": `${infoPage.search.toLowerCase()}`
+                                },
+                                {
+                                    "property": "firstName",
+                                    "operator": "contains",
+                                    "value": `${infoPage.search.toLowerCase()}`
+                                },
+                                {
+                                    "property": "lastName",
+                                    "operator": "contains",
+                                    "value": `${infoPage.search.toLowerCase()}`
+                                },
+                                {
+                                    "property": "secondLastName",
+                                    "operator": "contains",
+                                    "value": `${infoPage.search.toLowerCase()}`
+                                },
+                                {
+                                    "property": "username",
+                                    "operator": "contains",
+                                    "value": `${infoPage.search.toLowerCase()}`
+                                },
+                                {
+                                    "property": "email",
+                                    "operator": "contains",
+                                    "value": `${infoPage.search.toLowerCase()}`
+                                }
+                            ]
+                        },
+                        {
+                            "property": "customer.id",
+                            "operator": "=",
+                            "value": `${customerId}`
+                        },
+                        {
+                            "property": "isSuper",
+                            "operator": "=",
+                            "value": `${false}`
+                        },
+                        {
+                            "property": "userType",
+                            "operator": "=",
+                            "value": `CONTRACTOR`
+                        }
+                    ]
+                },
+                sort: "-createdDate",
+                limit: Config.tableRows,
+                offset: infoPage.offset,
+                fetchPlan: 'full',
+            });
+        }
+        infoPage.count = await getFilterEntityCount("User", raw);
+        dataPage = await getFilterEntityData("User", raw);
+        return dataPage;
     }
-    infoPage.count = await getFilterEntityCount("User", raw);
-    dataPage = await getFilterEntityData("User", raw);
-    return dataPage;
+    if(currentUser?.isMaster){
+        return response();
+    }else{
+        const permission = await getPermission('USER_CONTRACTOR', currentUser.id);
+        if(permission.code === 3){
+            infoPage.actions = permission.message.actionsText.split(';');
+            if(infoPage.actions.includes("READ")){
+                return response();
+            }else{
+                infoPage.msgPermission = "Usuario no tiene permiso de lectura.";
+                infoPage.count = 0;
+                return [];
+            }
+        }else{
+            infoPage.msgPermission = permission.message;
+            infoPage.count = 0;
+            return [];
+        }
+    }
 };
 export class Contractors {
     constructor() {
@@ -212,7 +235,7 @@ export class Contractors {
         let end = start + tableRows;
         let paginatedItems = data.slice(start, end);
         if (data.length === 0) {
-            let mensaje = 'No existen datos';
+            let mensaje = `No existen datos. ${infoPage.msgPermission}`;
             if(customerId == null){mensaje = 'Seleccione una empresa';}
             let row = document.createElement('tr');
             row.innerHTML = `
@@ -257,70 +280,76 @@ export class Contractors {
         const changeUserPasswordKeys = document.querySelectorAll('#change-user-password');
         changeUserPasswordKeys.forEach((buttonKey) => {
             buttonKey.addEventListener('click', async () => {
-                let userId = buttonKey.dataset.userid;
-                this.dialogContainer.style.display = 'block';
-                this.dialogContainer.innerHTML = `
-                    <div class="dialog_content" id="dialog-content">
-                        <div class="dialog">
-                            <div class="dialog_container padding_8">
-                                <div class="dialog_header">
-                                    <h2>Actualizar contraseña</h2>
-                                </div>
-
-                                <div class="dialog_message padding_8">
-                                    <div class="material_input">
-                                        <input type="password" id="password" autocomplete="none">
-                                        <label for="entity-lastname"><i class="fa-solid fa-lock"></i> Nueva contraseña</label>
+                if(!infoPage.actions.includes("UPD") && !Config.currentUser?.isMaster){
+                    alert("Usuario no tiene permiso de actualizar.");
+                }else{
+                    let userId = buttonKey.dataset.userid;
+                    this.dialogContainer.style.display = 'block';
+                    this.dialogContainer.innerHTML = `
+                        <div class="dialog_content" id="dialog-content">
+                            <div class="dialog">
+                                <div class="dialog_container padding_8">
+                                    <div class="dialog_header">
+                                        <h2>Actualizar contraseña</h2>
                                     </div>
 
-                                    <div class="material_input">
-                                        <input type="password" id="re-password" autocomplete="none">
-                                        <label for="entity-lastname"><i class="fa-solid fa-lock"></i> Repetir contraseña</label>
-                                    </div>
-                                </div>
+                                    <div class="dialog_message padding_8">
+                                        <div class="material_input">
+                                            <input type="password" id="password" autocomplete="none">
+                                            <label for="entity-lastname"><i class="fa-solid fa-lock"></i> Nueva contraseña</label>
+                                        </div>
 
-                                <div class="dialog_footer">
-                                    <button class="btn btn_primary" id="cancel">Cancelar</button>
-                                    <button class="btn btn_danger" id="update-password">Actualizar</button>
+                                        <div class="material_input">
+                                            <input type="password" id="re-password" autocomplete="none">
+                                            <label for="entity-lastname"><i class="fa-solid fa-lock"></i> Repetir contraseña</label>
+                                        </div>
+                                    </div>
+
+                                    <div class="dialog_footer">
+                                        <button class="btn btn_primary" id="cancel">Cancelar</button>
+                                        <button class="btn btn_danger" id="update-password">Actualizar</button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
-                `;
-                inputObserver();
-                const _password = document.getElementById('password');
-                const _repassword = document.getElementById('re-password');
-                const _updatePasswordButton = document.getElementById('update-password');
-                const _closeButton = document.getElementById('cancel');
-                const _dialog = document.getElementById('dialog-content');
-                _updatePasswordButton.addEventListener('click', () => {
-                    if (_password.value === '') {
-                        alert('El campo "Contraseña" no puede estar vacío.');
-                    }
-                    else if (_repassword.value === ' ') {
-                        alert('Debe repetir la contraseña para continuar');
-                    }
-                    else if (_password.value === _repassword.value) {
-                        let raw = JSON.stringify({
-                            "id": `${userId}`,
-                            "newPassword": `${_password.value}`
-                        });
-                        setPassword(raw)
-                            .then(() => {
-                            setTimeout(() => {
-                                alert('Se ha cambiado la contraseña');
-                                new CloseDialog().x(_dialog);
-                            }, 1000);
-                        });
-                    }
-                    else {
-                        console.log('Las contraseñas no coinciden');
-                        alert('Las contraseñas no coinciden');
-                    }
-                });
-                _closeButton.onclick = () => {
-                    new CloseDialog().x(_dialog);
-                };
+                    `;
+                    inputObserver();
+                    const _password = document.getElementById('password');
+                    const _repassword = document.getElementById('re-password');
+                    const _updatePasswordButton = document.getElementById('update-password');
+                    const _closeButton = document.getElementById('cancel');
+                    const _dialog = document.getElementById('dialog-content');
+                    _updatePasswordButton.addEventListener('click', () => {
+                        if(!infoPage.actions.includes("UPD") && !Config.currentUser?.isMaster){
+                            alert("Usuario no tiene permiso de actualizar.");
+                        }else if (_password.value === '') {
+                            alert('El campo "Contraseña" no puede estar vacío.');
+                        }
+                        else if (_repassword.value === ' ') {
+                            alert('Debe repetir la contraseña para continuar');
+                        }
+                        else if (_password.value === _repassword.value) {
+                            let raw = JSON.stringify({
+                                "id": `${userId}`,
+                                "newPassword": `${_password.value}`
+                            });
+                            setPassword(raw)
+                                .then(() => {
+                                setTimeout(() => {
+                                    alert('Se ha cambiado la contraseña');
+                                    new CloseDialog().x(_dialog);
+                                }, 1000);
+                            });
+                        }
+                        else {
+                            console.log('Las contraseñas no coinciden');
+                            alert('Las contraseñas no coinciden');
+                        }
+                    });
+                    _closeButton.onclick = () => {
+                        new CloseDialog().x(_dialog);
+                    };
+                }
             });
         });
     }
@@ -328,7 +357,11 @@ export class Contractors {
         // register entity
         const openEditor = document.getElementById('new-entity');
         openEditor.addEventListener('click', () => {
-            renderInterface('User');
+            if(infoPage.actions.includes("INS") || Config.currentUser?.isMaster){
+                renderInterface('User');
+            }else{
+                alert("Usuario no tiene permiso de registrar.");
+            }
         });
         const renderInterface = async (entities) => {
             this.entityDialogContainer.innerHTML = '';
@@ -461,85 +494,91 @@ export class Contractors {
             this.generateContractorName();
             const registerButton = document.getElementById('register-entity');
             registerButton.addEventListener('click', async() => {
-                let _values;
-                _values = {
-                    firstName: document.getElementById('entity-firstname'),
-                    lastName: document.getElementById('entity-lastname'),
-                    secondLastName: document.getElementById('entity-secondlastname'),
-                    dni: document.getElementById('entity-dni'),
-                    phoneNumer: document.getElementById('entity-phone'),
-                    state: document.getElementById('entity-state'),
-                    //customer: document.getElementById('entity-customer'),
-                    username: document.getElementById('entity-username'),
-                    //citadel: document.getElementById('entity-citadel'),
-                    temporalPass: document.getElementById('tempPass'),
-                    ingressHour: document.getElementById('start-time'),
-                    turnChange: document.getElementById('end-time'),
-                    //departments: document.getElementById('entity-department'),
-                    email: document.getElementById('entity-email'),
-                };
-                const contractorRaw = JSON.stringify({
-                    "lastName": `${_values.lastName.value}`,
-                    "secondLastName": `${_values.secondLastName.value}`,
-                    "isSuper": false,
-                    "newUser": true,
-                    "email": `${_values.email.value}`,
-                    "temp": `${_values.temporalPass.value}`,
-                    "isWebUser": false,
-                    "active": true,
-                    "firstName": `${_values.firstName.value}`,
-                    "ingressHour": `${_values.ingressHour.value}`,
-                    "turnChange": `${_values.turnChange.value}`,
-                    "state": {
-                        "id": `${_values.state.dataset.optionid}`
-                    },
-                    "contractor": {
-                        "id": `${currentUserInfo.contractor.id}`,
-                    },
-                    "customer": {
-                        "id": `${customerId}`
-                    },
-                    "citadel": {
-                        "id": `${currentUserInfo.citadel.id}`
-                    },
-                    "business":{
-                        "id": `${currentUserInfo.business.id}`
-                    },
-                    "department": {
-                        "id": `${currentUserInfo.department.id}`
-                    },
-                    "phone": `${_values.phoneNumer.value}`,
-                    "dni": `${_values.dni.value}`,
-                    "userType": "CONTRACTOR",
-                    "username": `${_values.username.value}@${currentCustomer.name.toLowerCase().replace(/\s+/g, '')}.com`,
-                });
-                const existUsername = await getVerifyUsername(`${_values.username.value}@${currentCustomer.name.toLowerCase().replace(/\s+/g, '')}.com`);
-                /*const existEmail = await getVerifyEmail(_values.email.value);
-                if(existEmail == true){
-                    alert("¡Correo electrónico ya existe!");
-                }else */
-                if (existUsername != "none") {
-                    alert("¡Usuario ya existe, es tipo " + existUsername + "!");
-                }
-                else if (_values.firstName.value === '' || _values.firstName.value === undefined) {
-                    alert("¡Nombre vacío!");
-                }
-                else if (_values.lastName.value === '' || _values.lastName.value === undefined) {
-                    alert("¡Primer apellido vacío!");
-                }
-                else if (_values.secondLastName.value === '' || _values.secondLastName.value === undefined) {
-                    alert("¡Segundo apellido vacío!");
-                }
-                /*else if (_values.email.value === '' || _values.email.value === undefined) {
-                    alert("¡Correo vacío!");
-                }*/
-                else if (_values.dni.value === '' || _values.dni.value === undefined) {
-                    alert("DNI vacío!");
-                }
-                else if (_values.temporalPass.value === '' || _values.temporalPass.value === undefined) {
-                    alert("Clave vacío!");
+                if(!infoPage.actions.includes("INS") && !Config.currentUser?.isMaster){
+                    alert("Usuario no tiene permiso de registrar.");
                 }else{
-                    reg(contractorRaw);
+                    let _values;
+                    _values = {
+                        firstName: document.getElementById('entity-firstname'),
+                        lastName: document.getElementById('entity-lastname'),
+                        secondLastName: document.getElementById('entity-secondlastname'),
+                        dni: document.getElementById('entity-dni'),
+                        phoneNumer: document.getElementById('entity-phone'),
+                        state: document.getElementById('entity-state'),
+                        //customer: document.getElementById('entity-customer'),
+                        username: document.getElementById('entity-username'),
+                        //citadel: document.getElementById('entity-citadel'),
+                        temporalPass: document.getElementById('tempPass'),
+                        ingressHour: document.getElementById('start-time'),
+                        turnChange: document.getElementById('end-time'),
+                        //departments: document.getElementById('entity-department'),
+                        email: document.getElementById('entity-email'),
+                    };
+                    const contractorRaw = JSON.stringify({
+                        "lastName": `${_values.lastName.value}`,
+                        "secondLastName": `${_values.secondLastName.value}`,
+                        "isSuper": false,
+                        "newUser": true,
+                        "email": `${_values.email.value}`,
+                        "temp": `${_values.temporalPass.value}`,
+                        "isMaster": false,
+                        "isWebUser": false,
+                        "active": true,
+                        "firstName": `${_values.firstName.value}`,
+                        "ingressHour": `${_values.ingressHour.value}`,
+                        "turnChange": `${_values.turnChange.value}`,
+                        "state": {
+                            "id": `${_values.state.dataset.optionid}`
+                        },
+                        "contractor": {
+                            "id": `${currentUserInfo.contractor.id}`,
+                        },
+                        "customer": {
+                            "id": `${customerId}`
+                        },
+                        "citadel": {
+                            "id": `${currentUserInfo.citadel.id}`
+                        },
+                        "business":{
+                            "id": `${currentUserInfo.business.id}`
+                        },
+                        "department": {
+                            "id": `${currentUserInfo.department.id}`
+                        },
+                        "phone": `${_values.phoneNumer.value}`,
+                        "dni": `${_values.dni.value}`,
+                        "userType": "CONTRACTOR",
+                        "username": `${_values.username.value}@${currentCustomer.name.toLowerCase().replace(/\s+/g, '')}.com`,
+                    });
+                    
+                    const existUsername = await getVerifyUsername(`${_values.username.value}@${currentCustomer.name.toLowerCase().replace(/\s+/g, '')}.com`);
+                    /*const existEmail = await getVerifyEmail(_values.email.value);
+                    if(existEmail == true){
+                        alert("¡Correo electrónico ya existe!");
+                    }else */
+                    if (existUsername != "none") {
+                        alert("¡Usuario ya existe, es tipo " + existUsername + "!");
+                    }
+                    else if (_values.firstName.value === '' || _values.firstName.value === undefined) {
+                        alert("¡Nombre vacío!");
+                    }
+                    else if (_values.lastName.value === '' || _values.lastName.value === undefined) {
+                        alert("¡Primer apellido vacío!");
+                    }
+                    else if (_values.secondLastName.value === '' || _values.secondLastName.value === undefined) {
+                        alert("¡Segundo apellido vacío!");
+                    }
+                    /*else if (_values.email.value === '' || _values.email.value === undefined) {
+                        alert("¡Correo vacío!");
+                    }*/
+                    else if (_values.dni.value === '' || _values.dni.value === undefined) {
+                        alert("DNI vacío!");
+                    }
+                    else if (_values.temporalPass.value === '' || _values.temporalPass.value === undefined) {
+                        alert("Clave vacío!");
+                    }else{
+                        reg(contractorRaw);
+                    }
                 }
             });
         };
@@ -559,111 +598,119 @@ export class Contractors {
     import() {
         const _importContractors = document.getElementById('import-entities');
         _importContractors.addEventListener('click', () => {
-            this.entityDialogContainer.innerHTML = '';
-            this.entityDialogContainer.style.display = 'flex';
-            this.entityDialogContainer.innerHTML = `
-                    <div class="entity_editor id="entity-editor">
-                        <div class="entity_editor_header">
-                            <div class="user_info">
-                                <div class="avatar">
-                                    <i class="fa-regular fa-up-from-line"></i>
+            if(!infoPage.actions.includes("INS") && !Config.currentUser?.isMaster){
+                alert("Usuario no tiene permiso de registrar.");
+            }else{
+                this.entityDialogContainer.innerHTML = '';
+                this.entityDialogContainer.style.display = 'flex';
+                this.entityDialogContainer.innerHTML = `
+                        <div class="entity_editor id="entity-editor">
+                            <div class="entity_editor_header">
+                                <div class="user_info">
+                                    <div class="avatar">
+                                        <i class="fa-regular fa-up-from-line"></i>
+                                    </div>
+                                    <h1 class="entity_editor_title">Importar <br> <small>Contratistas</small></h1>
                                 </div>
-                                <h1 class="entity_editor_title">Importar <br> <small>Contratistas</small></h1>
+                                <button class="btn btn_close_editor" id="close"><i class="fa-solid fa-x"></i></button>
                             </div>
-                            <button class="btn btn_close_editor" id="close"><i class="fa-solid fa-x"></i></button>
-                        </div>
-                        <!--EDITOR BODY -->
-                        <div class="entity_editor_body padding_t_8_important">
-                            <div class="sidebar_section">
-                                <div class="file_template">
-                                    <i class="fa-solid fa-file-csv"></i>
-                                    <div class="description">
-                                        <p class="filename">Plantilla de Contratistas</p>
-                                        <a href="./public/src/templates/NetguardContractors.csv" download="./public/src/templates/NetguardContractors.csv" rel="noopener" target="_self" class="filelink">Descargar</a>
+                            <!--EDITOR BODY -->
+                            <div class="entity_editor_body padding_t_8_important">
+                                <div class="sidebar_section">
+                                    <div class="file_template">
+                                        <i class="fa-solid fa-file-csv"></i>
+                                        <div class="description">
+                                            <p class="filename">Plantilla de Contratistas</p>
+                                            <a href="./public/src/templates/NetguardContractors.csv" download="./public/src/templates/NetguardContractors.csv" rel="noopener" target="_self" class="filelink">Descargar</a>
+                                        </div>
                                     </div>
                                 </div>
+                                <div class="sidebar_section">
+                                    <input type="file" id="file-handler">
+                                </div>
                             </div>
-                            <div class="sidebar_section">
-                                <input type="file" id="file-handler">
+                            <div class="entity_editor_footer">
+                                <button class="btn btn_primary btn_widder" id="button-import">Importar<button>
                             </div>
                         </div>
-                        <div class="entity_editor_footer">
-                            <button class="btn btn_primary btn_widder" id="button-import">Importar<button>
-                        </div>
-                    </div>
-                `;
-            this.close();
-            const _fileHandler = document.getElementById('file-handler');
-            _fileHandler.addEventListener('change', () => {
-                readFile(_fileHandler.files[0]);
-            });
-            async function readFile(file) {
-                //const customer = await getEntitiesData('Customer');
-                //const citadel = await getEntitiesData('Citadel');
-                //const department = await getEntitiesData('Department');
-                //const contractor = await getEntitiesData('Contractor');
-                const fileReader = new FileReader();
-                fileReader.readAsText(file);
-                fileReader.addEventListener('load', (e) => {
-                    let result = e.srcElement.result;
-                    let resultSplit = result.split('\r');
-                    let rawFile;
-                    let stageUsers = [];
-                    for (let i = 1; i < resultSplit.length; i++) {
-                        let contractorData = resultSplit[i].split(';');
-                        rawFile = JSON.stringify({
-                            "lastName": `${contractorData[1]?.replace(/\n/g, '')}`,
-                            "secondLastName": `${contractorData[2]?.replace(/\n/g, '')}`,
-                            "isSuper": false,
-                            "temp": `${contractorData[5]?.replace(/\n/g, '')}`,
-                            "isWebUser": false,
-                            "isActive": true,
-                            "newUser": true,
-                            "firstName": `${contractorData[0]?.replace(/\n/g, '')}`,
-                            "ingressHour": `${contractorData[6]?.replace(/\n/g, '')}`,
-                            "turnChange": `${contractorData[7]?.replace(/\n/g, '')}`,
-                            "state": {
-                                "id": "60885987-1b61-4247-94c7-dff348347f93"
-                            },
-                            "contractor": {
-                                "id": `${currentUserInfo.contractor.id}`
-                            },
-                            "customer": {
-                                "id": `${customerId}`
-                            },
-                            "citadel": {
-                                "id": `${currentUserInfo.citadel.id}`
-                            },
-                            "department": {
-                                "id": `${currentUserInfo.department.id}`
-                            },
-                            "business": {
-                                "id": `${currentUserInfo.business.id}`
-                            },
-                            "phone": `${contractorData[3]?.replace(/\n/g, '')}`,
-                            "dni": `${contractorData[4]?.replace(/\n/g, '')}`,
-                            "userType": "CONTRACTOR",
-                            "username": `${contractorData[0]?.toLowerCase().replace(/\n/g, '')}.${contractorData[1]?.toLowerCase().replace(/\n/g, '')}${contractorData[2]?.toLowerCase().replace(/\n/g, '')[0]}@${currentCustomer.name.toLowerCase().replace(/\s+/g, '')}.com`,
-                            "createVisit": false,
-                        });
-                        stageUsers.push(rawFile);
-                    }
-                    const _import = document.getElementById('button-import');
-                    _import.addEventListener('click', () => {
-                        stageUsers.forEach((user) => {
-                            registerEntity(user, 'User')
-                                .then((res) => {
-                                setTimeout(async () => {
-                                    //let data = await getUsers();
-                                    const tableBody = document.getElementById('datatable-body');
-                                    const container = document.getElementById('entity-editor-container');
-                                    new CloseDialog().x(container);
-                                    new Contractors().render(Config.offset, Config.currentPage, '');
-                                }, 1000);
+                    `;
+                this.close();
+                const _fileHandler = document.getElementById('file-handler');
+                _fileHandler.addEventListener('change', () => {
+                    readFile(_fileHandler.files[0]);
+                });
+                async function readFile(file) {
+                    //const customer = await getEntitiesData('Customer');
+                    //const citadel = await getEntitiesData('Citadel');
+                    //const department = await getEntitiesData('Department');
+                    //const contractor = await getEntitiesData('Contractor');
+                    const fileReader = new FileReader();
+                    fileReader.readAsText(file);
+                    fileReader.addEventListener('load', (e) => {
+                        let result = e.srcElement.result;
+                        let resultSplit = result.split('\r');
+                        let rawFile;
+                        let stageUsers = [];
+                        for (let i = 1; i < resultSplit.length; i++) {
+                            let contractorData = resultSplit[i].split(';');
+                            rawFile = JSON.stringify({
+                                "lastName": `${contractorData[1]?.replace(/\n/g, '')}`,
+                                "secondLastName": `${contractorData[2]?.replace(/\n/g, '')}`,
+                                "isSuper": false,
+                                "temp": `${contractorData[5]?.replace(/\n/g, '')}`,
+                                "isWebUser": false,
+                                "isActive": true,
+                                "newUser": true,
+                                "firstName": `${contractorData[0]?.replace(/\n/g, '')}`,
+                                "ingressHour": `${contractorData[6]?.replace(/\n/g, '')}`,
+                                "turnChange": `${contractorData[7]?.replace(/\n/g, '')}`,
+                                "state": {
+                                    "id": "60885987-1b61-4247-94c7-dff348347f93"
+                                },
+                                "contractor": {
+                                    "id": `${currentUserInfo.contractor.id}`
+                                },
+                                "customer": {
+                                    "id": `${customerId}`
+                                },
+                                "citadel": {
+                                    "id": `${currentUserInfo.citadel.id}`
+                                },
+                                "department": {
+                                    "id": `${currentUserInfo.department.id}`
+                                },
+                                "business": {
+                                    "id": `${currentUserInfo.business.id}`
+                                },
+                                "phone": `${contractorData[3]?.replace(/\n/g, '')}`,
+                                "dni": `${contractorData[4]?.replace(/\n/g, '')}`,
+                                "userType": "CONTRACTOR",
+                                "username": `${contractorData[0]?.toLowerCase().replace(/\n/g, '')}.${contractorData[1]?.toLowerCase().replace(/\n/g, '')}${contractorData[2]?.toLowerCase().replace(/\n/g, '')[0]}@${currentCustomer.name.toLowerCase().replace(/\s+/g, '')}.com`,
+                                "createVisit": false,
                             });
+                            stageUsers.push(rawFile);
+                        }
+                        const _import = document.getElementById('button-import');
+                        _import.addEventListener('click', () => {
+                            if(!infoPage.actions.includes("INS") && !Config.currentUser?.isMaster){
+                                alert("Usuario no tiene permiso de registrar.");
+                            }else{
+                                stageUsers.forEach((user) => {
+                                    registerEntity(user, 'User')
+                                        .then((res) => {
+                                        setTimeout(async () => {
+                                            //let data = await getUsers();
+                                            const tableBody = document.getElementById('datatable-body');
+                                            const container = document.getElementById('entity-editor-container');
+                                            new CloseDialog().x(container);
+                                            new Contractors().render(Config.offset, Config.currentPage, '');
+                                        }, 1000);
+                                    });
+                                });
+                            }
                         });
                     });
-                });
+                }
             }
         });
     }
@@ -879,7 +926,9 @@ export class Contractors {
                 }else{
                     update(contractorRaw);
                 }*/
-                if (_values.dni.value === '' || _values.dni.value === undefined) {
+                if(!infoPage.actions.includes("UPD") && !Config.currentUser?.isMaster){
+                    alert("Usuario no tiene permiso de actualizar.");
+                }else if (_values.dni.value === '' || _values.dni.value === undefined) {
                     alert("DNI vacío!");
                 }else{
                     update(contractorRaw);
@@ -911,143 +960,159 @@ export class Contractors {
         remove.forEach((remove) => {
             const entityId = remove.dataset.entityid;
             remove.addEventListener('click', () => {
-                this.dialogContainer.style.display = 'block';
-                this.dialogContainer.innerHTML = `
-          <div class="dialog_content" id="dialog-content">
-            <div class="dialog dialog_danger">
-              <div class="dialog_container">
-                <div class="dialog_header">
-                  <h2>¿Deseas eliminar este contratista?</h2>
-                </div>
+                if(!infoPage.actions.includes("DLT") && !Config.currentUser?.isMaster){
+                    alert("Usuario no tiene permiso de eliminar.");
+                }else{
+                    this.dialogContainer.style.display = 'block';
+                    this.dialogContainer.innerHTML = `
+            <div class="dialog_content" id="dialog-content">
+                <div class="dialog dialog_danger">
+                <div class="dialog_container">
+                    <div class="dialog_header">
+                    <h2>¿Deseas eliminar este contratista?</h2>
+                    </div>
 
-                <div class="dialog_message">
-                  <p>Esta acción no se puede revertir</p>
-                </div>
+                    <div class="dialog_message">
+                    <p>Esta acción no se puede revertir</p>
+                    </div>
 
-                <div class="dialog_footer">
-                  <button class="btn btn_primary" id="cancel">Cancelar</button>
-                  <button class="btn btn_danger" id="delete">Eliminar</button>
+                    <div class="dialog_footer">
+                    <button class="btn btn_primary" id="cancel">Cancelar</button>
+                    <button class="btn btn_danger" id="delete">Eliminar</button>
+                    </div>
                 </div>
-              </div>
+                </div>
             </div>
-          </div>
-        `;
-                // delete button
-                // cancel button
-                // dialog content
-                const deleteButton = document.getElementById('delete');
-                const cancelButton = document.getElementById('cancel');
-                const dialogContent = document.getElementById('dialog-content');
-                deleteButton.onclick = async() => {
-                    deleteEntity('User', entityId)
-                    .then((res) => {
-                        setTimeout(async () => {
-                            //let data = await getUsers();
-                            const tableBody = document.getElementById('datatable-body');
-                            new CloseDialog().x(dialogContent);
-                            new Contractors().render(infoPage.offset, infoPage.currentPage, infoPage.search);
-                        }, 1000);
-                    });
-                };
-                cancelButton.onclick = () => {
-                    new CloseDialog().x(dialogContent);
-                    //this.render();
-                };
+            `;
+                    // delete button
+                    // cancel button
+                    // dialog content
+                    const deleteButton = document.getElementById('delete');
+                    const cancelButton = document.getElementById('cancel');
+                    const dialogContent = document.getElementById('dialog-content');
+                    deleteButton.onclick = async() => {
+                        if(!infoPage.actions.includes("DLT") && !Config.currentUser?.isMaster){
+                            alert("Usuario no tiene permiso de eliminar.");
+                        }else{
+                            deleteEntity('User', entityId)
+                            .then((res) => {
+                                setTimeout(async () => {
+                                    //let data = await getUsers();
+                                    const tableBody = document.getElementById('datatable-body');
+                                    new CloseDialog().x(dialogContent);
+                                    new Contractors().render(infoPage.offset, infoPage.currentPage, infoPage.search);
+                                }, 1000);
+                            });
+                        }
+                    };
+                    cancelButton.onclick = () => {
+                        new CloseDialog().x(dialogContent);
+                        //this.render();
+                    };
+                }
             });
         });
     }
     export = () => {
         const exportUsers = document.getElementById('export-entities');
         exportUsers.addEventListener('click', async () => {
-            this.dialogContainer.style.display = 'block';
-                this.dialogContainer.innerHTML = `
-                <div class="dialog_content" id="dialog-content">
-                    <div class="dialog">
-                        <div class="dialog_container padding_8">
-                            <div class="dialog_header">
-                                <h2>Seleccione un tipo</h2>
-                            </div>
-
-                            <div class="dialog_message padding_8">
-                                <div class="form_group">
-                                    <label for="exportCsv">
-                                        <input type="radio" id="exportCsv" name="exportOption" value="csv" /> CSV
-                                    </label>
-
-                                    <label for="exportXls">
-                                        <input type="radio" id="exportXls" name="exportOption" value="xls" checked /> XLS
-                                    </label>
-
-                                    <label for="exportPdf">
-                                        <input type="radio" id="exportPdf" name="exportOption" value="pdf" /> PDF
-                                    </label>
+            if(!infoPage.actions.includes("DWN") && !Config.currentUser?.isMaster){
+                alert("Usuario no tiene permiso de exportar.");
+            }else{
+                this.dialogContainer.style.display = 'block';
+                    this.dialogContainer.innerHTML = `
+                    <div class="dialog_content" id="dialog-content">
+                        <div class="dialog">
+                            <div class="dialog_container padding_8">
+                                <div class="dialog_header">
+                                    <h2>Seleccione un tipo</h2>
                                 </div>
-                            </div>
 
-                            <div class="dialog_footer">
-                                <button class="btn btn_primary" id="cancel">Cancelar</button>
-                                <button class="btn btn_danger" id="export-data">Exportar</button>
+                                <div class="dialog_message padding_8">
+                                    <div class="form_group">
+                                        <label for="exportCsv">
+                                            <input type="radio" id="exportCsv" name="exportOption" value="csv" /> CSV
+                                        </label>
+
+                                        <label for="exportXls">
+                                            <input type="radio" id="exportXls" name="exportOption" value="xls" checked /> XLS
+                                        </label>
+
+                                        <label for="exportPdf">
+                                            <input type="radio" id="exportPdf" name="exportOption" value="pdf" /> PDF
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div class="dialog_footer">
+                                    <button class="btn btn_primary" id="cancel">Cancelar</button>
+                                    <button class="btn btn_danger" id="export-data">Exportar</button>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
-            `;
-                inputObserver();
-                const _closeButton = document.getElementById('cancel');
-                const exportButton = document.getElementById('export-data');
-                const _dialog = document.getElementById('dialog-content');
-                exportButton.addEventListener('click', async () => {
-                    const _values = {
-                        exportOption: document.getElementsByName('exportOption')
-                    };
-                    let rawExport = JSON.stringify({
-                        "filter": {
-                            "conditions": [
-                                {
-                                    "property": "customer.id",
-                                    "operator": "=",
-                                    "value": `${customerId}`
+                `;
+                    inputObserver();
+                    const _closeButton = document.getElementById('cancel');
+                    const exportButton = document.getElementById('export-data');
+                    const _dialog = document.getElementById('dialog-content');
+                    exportButton.addEventListener('click', async () => {
+                        if(!infoPage.actions.includes("DWN") && !Config.currentUser?.isMaster){
+                            alert("Usuario no tiene permiso de exportar.");
+                        }else{
+                            const _values = {
+                                exportOption: document.getElementsByName('exportOption')
+                            };
+                            let rawExport = JSON.stringify({
+                                "filter": {
+                                    "conditions": [
+                                        {
+                                            "property": "customer.id",
+                                            "operator": "=",
+                                            "value": `${customerId}`
+                                        },
+                                        {
+                                            "property": "isSuper",
+                                            "operator": "=",
+                                            "value": `${false}`
+                                        },
+                                        {
+                                            "property": "userType",
+                                            "operator": "=",
+                                            "value": `CONTRACTOR`
+                                        }
+                                    ],
                                 },
-                                {
-                                    "property": "isSuper",
-                                    "operator": "=",
-                                    "value": `${false}`
-                                },
-                                {
-                                    "property": "userType",
-                                    "operator": "=",
-                                    "value": `CONTRACTOR`
-                                }
-                            ],
-                        },
-                        sort: "-createdDate",
-                        fetchPlan: 'full',
-                    });
-                    const users = await getFilterEntityData("User", rawExport); //await getUsers()
-                    for (let i = 0; i < _values.exportOption.length; i++) {
-                        let ele = _values.exportOption[i];
-                        if (ele.type = "radio") {
-                            if (ele.checked) {
-                                if (ele.value == "xls") {
-                                    // @ts-ignore
-                                    exportContractorXls(users);
-                                }
-                                else if (ele.value == "csv") {
-                                    // @ts-ignore
-                                    exportContractorCsv(users);
-                                }
-                                else if (ele.value == "pdf") {
-                                    // @ts-ignore
-                                    exportContractorPdf(users);
+                                sort: "-createdDate",
+                                fetchPlan: 'full',
+                            });
+                            const users = await getFilterEntityData("User", rawExport); //await getUsers()
+                            for (let i = 0; i < _values.exportOption.length; i++) {
+                                let ele = _values.exportOption[i];
+                                if (ele.type = "radio") {
+                                    if (ele.checked) {
+                                        if (ele.value == "xls") {
+                                            // @ts-ignore
+                                            exportContractorXls(users);
+                                        }
+                                        else if (ele.value == "csv") {
+                                            // @ts-ignore
+                                            exportContractorCsv(users);
+                                        }
+                                        else if (ele.value == "pdf") {
+                                            // @ts-ignore
+                                            exportContractorPdf(users);
+                                        }
+                                    }
                                 }
                             }
                         }
-                    }
-                });
-                _closeButton.onclick = () => {
-                    new CloseDialog().x(_dialog);
-                };
-            });
+                    });
+                    _closeButton.onclick = () => {
+                        new CloseDialog().x(_dialog);
+                    };
+            }
+        });
     };
     pagination(items, limitRows, currentPage) {
         const tableBody = document.getElementById('datatable-body');

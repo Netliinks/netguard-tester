@@ -5,7 +5,7 @@
 //
 import { Config } from "../../Configs.js";
 import { getEntityData, getUserInfo, getFilterEntityData, getFilterEntityCount } from "../../endpoints.js";
-import { drawTagsIntoTables, filterDataByHeaderType, pageNumbers, fillBtnPagination } from "../../tools.js";
+import { drawTagsIntoTables, filterDataByHeaderType, pageNumbers, fillBtnPagination, getPermission } from "../../tools.js";
 import { tableLayout, tableLayoutTemplate } from "./Layout.js";
 // Local configs
 const tableRows = Config.tableRows;
@@ -15,66 +15,90 @@ let infoPage = {
     count: 0,
     offset: Config.offset,
     currentPage: currentPage,
-    search: ""
+    search: "",
+    msgPermission: "",
+    actions: []
   };
 const currentBusiness = async () => {
-    const currentUser = await getUserInfo();
-    const business = await getEntityData('User', `${currentUser.attributes.id}`);
-    return business;
+    //const currentUser = await getUserInfo();
+    //const business = await getEntityData('User', `${currentUser.attributes.id}`);
+    return Config.currentUser;
 };
 const GetCustomers = async () => {
     const businessData = await currentBusiness();
     /*const customers = await getEntitiesData('Customer');
     const FCustomer = customers.filter((data) => data.business.id === `${businessData.business.id}`);*/
-    let raw = JSON.stringify({
-        "filter": {
-            "conditions": [
-                {
-                    "property": "business.id",
-                    "operator": "=",
-                    "value": `${businessData.business.id}`
-                }
-            ],
-        },
-        sort: "-createdDate",
-        limit: Config.tableRows,
-        offset: infoPage.offset,
-        fetchPlan: 'full',
-    });
-    if (infoPage.search != "") {
-        raw = JSON.stringify({
+    const response = async () => {
+        let raw = JSON.stringify({
             "filter": {
                 "conditions": [
                     {
-                        "group": "OR",
-                        "conditions": [
-                            {
-                                "property": "name",
-                                "operator": "contains",
-                                "value": `${infoPage.search.toLowerCase()}`
-                            },
-                            {
-                                "property": "ruc",
-                                "operator": "contains",
-                                "value": `${infoPage.search.toLowerCase()}`
-                            }
-                        ]
-                    },
-                    {
-                      "property": "business.id",
-                      "operator": "=",
-                      "value": `${businessData.business.id}`
+                        "property": "business.id",
+                        "operator": "=",
+                        "value": `${businessData.business.id}`
                     }
-                ]
+                ],
             },
             sort: "-createdDate",
             limit: Config.tableRows,
             offset: infoPage.offset,
             fetchPlan: 'full',
         });
+        if (infoPage.search != "") {
+            raw = JSON.stringify({
+                "filter": {
+                    "conditions": [
+                        {
+                            "group": "OR",
+                            "conditions": [
+                                {
+                                    "property": "name",
+                                    "operator": "contains",
+                                    "value": `${infoPage.search.toLowerCase()}`
+                                },
+                                {
+                                    "property": "ruc",
+                                    "operator": "contains",
+                                    "value": `${infoPage.search.toLowerCase()}`
+                                }
+                            ]
+                        },
+                        {
+                        "property": "business.id",
+                        "operator": "=",
+                        "value": `${businessData.business.id}`
+                        }
+                    ]
+                },
+                sort: "-createdDate",
+                limit: Config.tableRows,
+                offset: infoPage.offset,
+                fetchPlan: 'full',
+            });
+        }
+        infoPage.count = await getFilterEntityCount("Customer", raw);
+        return await getFilterEntityData("Customer", raw);
     }
-      infoPage.count = await getFilterEntityCount("Customer", raw);
-    return await getFilterEntityData("Customer", raw);
+    if(businessData?.isMaster){
+        return response();
+    }else{
+        const permission = await getPermission('CUSTOMER_CHANGE', businessData.id);
+        if(permission.code === 3){
+            infoPage.actions = permission.message.actionsText.split(';');
+            if(infoPage.actions.includes("CHANGE")){
+                return response();
+            }else{
+                infoPage.msgPermission = "Usuario no tiene permiso de cambiar de empresa.";
+                infoPage.count = 0;
+                return [];
+            }
+        }else{
+            infoPage.msgPermission = permission.message;
+            infoPage.count = 0;
+            return [];
+        }
+        
+    }
 };
 export class SelectCustomer {
     constructor() {
@@ -112,7 +136,7 @@ export class SelectCustomer {
             if (customers.length === 0) {
                 let row = document.createElement('TR');
                 row.innerHTML = `
-            <td>No existen datos<td>
+            <td>No existen datos. ${infoPage.msgPermission}<td>
             <td></td>
             <td></td>
             `;
@@ -123,11 +147,12 @@ export class SelectCustomer {
                     let customer = paginatedItems[i]; // getting visit items
                     let row = document.createElement('TR');
                     row.innerHTML += `
-                    <td style="white-space: nowrap">${customer.name}</td>
-                    <td>${customer.ruc}</td>
-                    <td class="tag"><span>${customer.state.name}</span></td>
-                    <td>${customer.permitMarcation ? 'Si' : 'No'}</td>
-                    <td>${customer.permitVehicular ? 'Si' : 'No'}</td>
+                    <td style="white-space: nowrap">${customer?.name ?? ''}</td>
+                    <td>${customer?.ruc ?? ''}</td>
+                    <td class="tag"><span>${customer?.state?.name ?? ''}</span></td>
+                    <td>${customer?.permitMarcation ? 'Si' : 'No'}</td>
+                    <td>${customer?.permitVehicular ? 'Si' : 'No'}</td>
+                    <td>${customer?.permitRoutine ? 'Si' : 'No'}</td>
                     <td>
                         <button class="button" id="entity-details" data-entityId="${customer.id}">
                             <i class="table_icon fa-regular fa-check"></i>

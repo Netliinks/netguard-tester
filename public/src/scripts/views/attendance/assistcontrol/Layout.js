@@ -72,7 +72,7 @@ export const UIContentLayout = `
         <div class="datatable_pagination" id="pagination-container"></div>
         </div>`;
 export const UIRightSidebar = `
-<div class="entity_editor" id="entity-editor">
+<div class="entity_editor" id="entity-editor" style="max-width:57%">
 <div class="entity_editor_header">
   <div class="user_info">
     <div class="avatar"><i class="fa-regular fa-user"></i></div>
@@ -84,85 +84,91 @@ export const UIRightSidebar = `
 
 <!-- EDITOR BODY -->
 <div class="entity_editor_body">
-    <div class="tag"><i class="label active_label"><i class="fa-solid fa-circle-dot"></i> Estado:</i> <span class="tag_gray" id="marking-status"></span></div>
-  <br><br>
+    <div class="fila" style="display: flex;">
+        <div class="elemento" style ="flex: 1;" id="gallery">
+            <h3>Galería Ingreso</h3>
+            <div id="galeria" style="width: 450px;"></div>
+            <br>
+            <h3>Galería Salida</h3>
+            <div id="galeria2" style="width: 450px;"></div>
+        </div>
+        <div class="elemento" style ="flex: 0.5;">
+            <div class="tag"><i class="label active_label"><i class="fa-solid fa-circle-dot"></i> Estado:</i> <span class="tag_gray" id="marking-status"></span></div>
+            <br><br>
 
-    <div class="input_detail">
-        <label for="marking-name"><i class="fa-solid fa-user"></i></label>
-        <input type="text" id="marking-name" class="input_filled" readonly>
-    </div>
-    <br>
-    <div class="input_detail">
-        <label for="marking-dni"><i class="fa-solid fa-address-card"></i></label>
-        <input type="text" id="marking-dni" class="input_filled" readonly>
-    </div>
-    <br>
-    <div class="input_detail">
-        <label for="marking-type"><i class="fa-solid fa-object-group"></i></label>
-        <input type="text" id="marking-type" class="input_filled" readonly>
-    </div>
-    <br>
-    <!--
-    <div class="input_detail">
-        <label for="marking-department"><i class="fa-solid fa-building"></i></label>
-        <input type="text" id="marking-department" class="input_filled" readonly>
-    </div>
-    <br>
-    <div class="input_detail">
-        <label for="marking-contractor"><i class="fa-solid fa-briefcase"></i></label>
-        <input type="text" id="marking-contractor" class="input_filled" readonly>
-    </div>
-    <br>
-    -->
-    <!-- Start marking -->
-    <h3>Ingreso</h3>
-    <br>
-    <div class="input_detail">
-        <label for="marking-start-date"><i class="fa-solid fa-calendar"></i></label>
-        <input type="date" id="marking-start-date" class="input_filled" readonly>
-    </div>
-    <br>
-    <div class="input_detail">
-        <label for="marking-start-time"><i class="fa-solid fa-clock"></i></label>
-        <input type="time" id="marking-start-time" class="input_filled" readonly>
-    </div>
-    <br>
-    <div class="input_detail">
-        <label for="marking-start-guard-id"><i class="fa-solid fa-user-police"></i></label>
-        <input type="text" id="marking-start-guard-id" class="input_filled" readonly>
-    </div>
-    <br>
-    <div class="input_detail">
-        <label for="marking-start-guard-name"><i class="fa-solid fa-user-police"></i></label>
-        <input type="text" id="marking-start-guard-name" class="input_filled" readonly>
-    </div>
-    <br>
-    <!-- End marking -->
-    <h3>Salida</h3>
-    <br>
-    <div class="input_detail">
-        <label for="marking-end-date"><i class="fa-solid fa-calendar"></i></label>
-        <input type="date" id="marking-end-date" class="input_filled" readonly>
-    </div>
-    <br>
-    <div class="input_detail">
-        <label for="marking-end-time"><i class="fa-solid fa-clock"></i></label>
-        <input type="time" id="marking-end-time" class="input_filled" readonly>
-    </div>
-    <br>
-    <div class="input_detail">
-        <label for="marking-end-guard-id"><i class="fa-solid fa-user-police"></i></label>
-        <input type="text" id="marking-end-guard-id" class="input_filled" readonly>
-    </div>
-    <br>
-    <div class="input_detail">
-        <label for="marking-end-guard-name"><i class="fa-solid fa-user-police"></i></label>
-        <input type="text" id="marking-end-guard-name" class="input_filled" readonly>
-    </div>
-    <br>
-    <h3>Galería</h3>
-
-    <div id="galeria">
+            <div class="input_detail">
+                <label for="marking-name"><i class="fa-solid fa-user"></i></label>
+                <input type="text" id="marking-name" class="input_filled" readonly>
+            </div>
+            <br>
+            <div class="input_detail">
+                <label for="marking-dni"><i class="fa-solid fa-address-card"></i></label>
+                <input type="text" id="marking-dni" class="input_filled" readonly>
+            </div>
+            <br>
+            <div class="input_detail">
+                <label for="marking-type"><i class="fa-solid fa-object-group"></i></label>
+                <input type="text" id="marking-type" class="input_filled" readonly>
+            </div>
+            <br>
+            <!--
+            <div class="input_detail">
+                <label for="marking-department"><i class="fa-solid fa-building"></i></label>
+                <input type="text" id="marking-department" class="input_filled" readonly>
+            </div>
+            <br>
+            <div class="input_detail">
+                <label for="marking-contractor"><i class="fa-solid fa-briefcase"></i></label>
+                <input type="text" id="marking-contractor" class="input_filled" readonly>
+            </div>
+            <br>
+            -->
+            <!-- Start marking -->
+            <h3>Ingreso</h3>
+            <br>
+            <div class="input_detail">
+                <label for="marking-start-date"><i class="fa-solid fa-calendar"></i></label>
+                <input type="date" id="marking-start-date" class="input_filled" readonly>
+            </div>
+            <br>
+            <div class="input_detail">
+                <label for="marking-start-time"><i class="fa-solid fa-clock"></i></label>
+                <input type="time" id="marking-start-time" class="input_filled" readonly>
+            </div>
+            <br>
+            <div class="input_detail">
+                <label for="marking-start-guard-id"><i class="fa-solid fa-user-police"></i></label>
+                <input type="text" id="marking-start-guard-id" class="input_filled" readonly>
+            </div>
+            <br>
+            <div class="input_detail">
+                <label for="marking-start-guard-name"><i class="fa-solid fa-user-police"></i></label>
+                <input type="text" id="marking-start-guard-name" class="input_filled" readonly>
+            </div>
+            <br>
+            <!-- End marking -->
+            <h3>Salida</h3>
+            <br>
+            <div class="input_detail">
+                <label for="marking-end-date"><i class="fa-solid fa-calendar"></i></label>
+                <input type="date" id="marking-end-date" class="input_filled" readonly>
+            </div>
+            <br>
+            <div class="input_detail">
+                <label for="marking-end-time"><i class="fa-solid fa-clock"></i></label>
+                <input type="time" id="marking-end-time" class="input_filled" readonly>
+            </div>
+            <br>
+            <div class="input_detail">
+                <label for="marking-end-guard-id"><i class="fa-solid fa-user-police"></i></label>
+                <input type="text" id="marking-end-guard-id" class="input_filled" readonly>
+            </div>
+            <br>
+            <div class="input_detail">
+                <label for="marking-end-guard-name"><i class="fa-solid fa-user-police"></i></label>
+                <input type="text" id="marking-end-guard-name" class="input_filled" readonly>
+            </div>
+        </div>    
     </div>
 </div>
 </div>

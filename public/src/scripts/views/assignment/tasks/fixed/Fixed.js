@@ -1,6 +1,6 @@
 // @filename: Fixed.ts
 import { deleteEntity, getEntitiesData, getFilterEntityCount, registerEntity, updateEntity, getEntityData, setFile, getUserInfo, getFile, postNotificationPush, getFilterEntityData } from "../../../../endpoints.js";
-import { inputObserver, inputSelect, CloseDialog, filterDataByHeaderType, fillBtnPagination, searchUniversalSingle, currentDateTime } from "../../../../tools.js";
+import { inputObserver, inputSelect, CloseDialog, filterDataByHeaderType, fillBtnPagination, searchUniversalSingle, currentDateTime, getPermission } from "../../../../tools.js";
 import { Config } from "../../../../Configs.js";
 import { tableLayout } from "./Layout.js";
 import { tableLayoutTemplate } from "./Template.js";
@@ -14,12 +14,14 @@ let infoPage = {
     count: 0,
     offset: Config.offset,
     currentPage: currentPage,
-    search: ""
+    search: "",
+    msgPermission: "",
+    actions: []
 };
 const currentBusiness = async() => {
-    const currentUser = await getUserInfo();
-    const userid = await getEntityData('User', `${currentUser.attributes.id}`);
-    return userid;
+    //const currentUser = await getUserInfo();
+    //const userid = await getEntityData('User', `${currentUser.attributes.id}`);
+    return Config.currentUser;
   }
 let dataPage;
 let currentUser;
@@ -33,45 +35,10 @@ const getTakFixed = async () => {
     //const notesRaw = await getEntitiesData('Note');
     //const notes = notesRaw.filter((data) => data.customer?.id === `${customerId}`);
     currentUser = await currentBusiness();
-    let raw = JSON.stringify({
-        "filter": {
-            "conditions": [
-                {
-                    "property": "customer.id",
-                    "operator": "=",
-                    "value": `${customerId}`
-                },
-                {
-                    "property": "taskType",
-                    "operator": "=",
-                    "value": `FIJAS`
-                },
-                {
-                    "property": "user.userType",
-                    "operator": "=",
-                    "value": `GUARD`
-                }
-            ],
-        },
-        sort: "+execTime",
-        limit: Config.tableRows,
-        offset: infoPage.offset,
-        fetchPlan: 'full',
-    });
-    if (infoPage.search != "") {
-        raw = JSON.stringify({
+    const response = async () => {
+        let raw = JSON.stringify({
             "filter": {
                 "conditions": [
-                    {
-                        "group": "OR",
-                        "conditions": [
-                            {
-                                "property": "name",
-                                "operator": "contains",
-                                "value": `${infoPage.search.toLowerCase()}`
-                            }
-                        ]
-                    },
                     {
                         "property": "customer.id",
                         "operator": "=",
@@ -87,17 +54,74 @@ const getTakFixed = async () => {
                         "operator": "=",
                         "value": `GUARD`
                     }
-                ]
+                ],
             },
             sort: "+execTime",
             limit: Config.tableRows,
             offset: infoPage.offset,
             fetchPlan: 'full',
         });
+        if (infoPage.search != "") {
+            raw = JSON.stringify({
+                "filter": {
+                    "conditions": [
+                        {
+                            "group": "OR",
+                            "conditions": [
+                                {
+                                    "property": "name",
+                                    "operator": "contains",
+                                    "value": `${infoPage.search.toLowerCase()}`
+                                }
+                            ]
+                        },
+                        {
+                            "property": "customer.id",
+                            "operator": "=",
+                            "value": `${customerId}`
+                        },
+                        {
+                            "property": "taskType",
+                            "operator": "=",
+                            "value": `FIJAS`
+                        },
+                        {
+                            "property": "user.userType",
+                            "operator": "=",
+                            "value": `GUARD`
+                        }
+                    ]
+                },
+                sort: "+execTime",
+                limit: Config.tableRows,
+                offset: infoPage.offset,
+                fetchPlan: 'full',
+            });
+        }
+        infoPage.count = await getFilterEntityCount("Task_", raw);
+        dataPage = await getFilterEntityData("Task_", raw);
+        return dataPage;
     }
-    infoPage.count = await getFilterEntityCount("Task_", raw);
-    dataPage = await getFilterEntityData("Task_", raw);
-    return dataPage;
+    if(Config.currentUser?.isMaster){
+        return response();
+    }else{
+        const permission = await getPermission('TASK_FIXED', Config.currentUser.id);
+        if(permission.code === 3){
+            infoPage.actions = permission.message.actionsText.split(';');
+            if(infoPage.actions.includes("READ")){
+                return response();
+            }else{
+                infoPage.msgPermission = "Usuario no tiene permiso de lectura.";
+                infoPage.count = 0;
+                return [];
+            }
+        }else{
+            infoPage.msgPermission = permission.message;
+            infoPage.count = 0;
+            return [];
+        }
+    
+    }
 
 };
 
@@ -217,7 +241,7 @@ export class Fixed {
         let end = start + tableRows;
         let paginatedItems = data.slice(start, end);
         if (data.length === 0) {
-            let mensaje = 'No existen datos';
+            let mensaje = `No existen datos. ${infoPage.msgPermission}`;
             if (customerId == null) { mensaje = 'Seleccione una empresa'; }
             let row = document.createElement('tr');
 
@@ -335,8 +359,11 @@ export class Fixed {
         // register entity
         const openEditor = document.getElementById('new-entity');
         openEditor.addEventListener('click', () => {
-            renderInterface();
-
+            if(infoPage.actions.includes("INS") || Config.currentUser?.isMaster){
+                renderInterface();
+            }else{
+                alert("Usuario no tiene permiso de registrar.");
+            }
         });
         const renderInterface = async () => {
             const notification = await searchUniversalSingle("name", "=", "Consigna", "NotificationType");
@@ -413,76 +440,80 @@ export class Fixed {
 
             registerButton.addEventListener('click', async (e) => {
                 e.preventDefault();
-                const name = document.getElementById('entity-name')
-                const description = document.getElementById('entity-description')
-                const executionTime = document.getElementById('execution-time')
+                if(!infoPage.actions.includes("INS") && !Config.currentUser?.isMaster){
+                    alert("Usuario no tiene permiso de registrar.");
+                }else{
+                    const name = document.getElementById('entity-name')
+                    const description = document.getElementById('entity-description')
+                    const executionTime = document.getElementById('execution-time')
 
-                const inputsCollection = {
-                    name: name,
-                    executionTime: executionTime,
-                    description: description
+                    const inputsCollection = {
+                        name: name,
+                        executionTime: executionTime,
+                        description: description
 
-                };
-                let _userInfo = await getUserInfo();
-                const customerId = localStorage.getItem('customer_id');
+                    };
+                    //let _userInfo = await getUserInfo();
+                    const customerId = localStorage.getItem('customer_id');
 
-                const raw = JSON.stringify({
-                    "taskType": `FIJAS`,
-                    "name": `${inputsCollection.name.value}`,
-                    "description": `${inputsCollection.description.value}`,
-                    "execDate": `${dateFormat}`,
-                    "user": {
-                        "id": `${_userInfo['attributes']['id']}`
-                    },
-                    "customer": {
-                        "id": `${customerId}`
-                    },
-                    "execTime": `${inputsCollection.executionTime.value}`,
-                    "startTime": `${hourFormat}`,
-                    "startDate": `${dateFormat}`,
-
-                });
-                if (name.value.trim() === '' || name.value.trim() === null) {
-                    alert('Nombre del consigna fija vacío')
-                }
-                if (executionTime.value.trim() === '' || executionTime.value.trim() === null) {
-                    alert('Debe especificar la hora de ejecución de la consigna')
-                }
-                else {
-                    reg(raw);
-                    let rawUser = JSON.stringify({
-                        "filter": {
-                            "conditions": [
-                                {
-                                    "property": "customer.id",
-                                    "operator": "=",
-                                    "value": `${customerId}`
-                                },
-                                {
-                                    "property": "userType",
-                                    "operator": "=",
-                                    "value": `GUARD`
-                                },
-                                {
-                                    "property": "state.name",
-                                    "operator": "=",
-                                    "value": `Enabled`
-                                },
-                                {
-                                    "property": "token",
-                                    "operator": "<>",
-                                    "value": ``
-                                }
-                            ],
+                    const raw = JSON.stringify({
+                        "taskType": `FIJAS`,
+                        "name": `${inputsCollection.name.value}`,
+                        "description": `${inputsCollection.description.value}`,
+                        "execDate": `${dateFormat}`,
+                        "user": {
+                            "id": `${Config.currentUser.id}` //`${_userInfo['attributes']['id']}`
                         },
+                        "customer": {
+                            "id": `${customerId}`
+                        },
+                        "execTime": `${inputsCollection.executionTime.value}`,
+                        "startTime": `${hourFormat}`,
+                        "startDate": `${dateFormat}`,
+
                     });
-                    const dataUser = await getFilterEntityData("User", rawUser);
-                    for (let i = 0; i < dataUser.length; i++) {
-
-                        const data = { "token": dataUser[i]['token'], "title": "General", "body": `${inputsCollection.name.value}` }
-                        const envioPush = await postNotificationPush(data);
+                    if (name.value.trim() === '' || name.value.trim() === null) {
+                        alert('Nombre del consigna fija vacío')
                     }
+                    if (executionTime.value.trim() === '' || executionTime.value.trim() === null) {
+                        alert('Debe especificar la hora de ejecución de la consigna')
+                    }
+                    else {
+                        reg(raw);
+                        let rawUser = JSON.stringify({
+                            "filter": {
+                                "conditions": [
+                                    {
+                                        "property": "customer.id",
+                                        "operator": "=",
+                                        "value": `${customerId}`
+                                    },
+                                    {
+                                        "property": "userType",
+                                        "operator": "=",
+                                        "value": `GUARD`
+                                    },
+                                    {
+                                        "property": "state.name",
+                                        "operator": "=",
+                                        "value": `Enabled`
+                                    },
+                                    {
+                                        "property": "token",
+                                        "operator": "<>",
+                                        "value": ``
+                                    }
+                                ],
+                            },
+                        });
+                        const dataUser = await getFilterEntityData("User", rawUser);
+                        for (let i = 0; i < dataUser.length; i++) {
 
+                            const data = { "token": dataUser[i]['token'], "title": "General", "body": `${inputsCollection.name.value}` }
+                            const envioPush = await postNotificationPush(data);
+                        }
+
+                    }
                 }
 
 
@@ -597,7 +628,9 @@ export class Fixed {
                 e.preventDefault()
                 const name = document.getElementById('entity-name')
                 const executionTime = document.getElementById('execution-time')
-                if (name.value.trim() === '' || name.value.trim() === null) {
+                if(!infoPage.actions.includes("UPD") && !Config.currentUser?.isMaster){
+                    alert("Usuario no tiene permiso de actualizar.");
+                }else if (name.value.trim() === '' || name.value.trim() === null) {
                     alert('Nombre del consigna fija vacío')
                 }
                 else if (executionTime.value.trim() === '' || executionTime.value.trim() === null) {
@@ -701,45 +734,53 @@ export class Fixed {
             const entityId = remove.dataset.entityid;
 
             remove.addEventListener('click', () => {
-                this.dialogContainer.style.display = 'flex';
-                this.dialogContainer.innerHTML = `
-          <div class="dialog_content" id="dialog-content">
-            <div class="dialog dialog_danger">
-              <div class="dialog_container">
-                <div class="dialog_header">
-                  <h2>¿Deseas eliminar este Consigna fija?</h2>
-                </div>
+                if(!infoPage.actions.includes("DLT") && !Config.currentUser?.isMaster){
+                    alert("Usuario no tiene permiso de eliminar.");
+                }else{
+                    this.dialogContainer.style.display = 'flex';
+                    this.dialogContainer.innerHTML = `
+            <div class="dialog_content" id="dialog-content">
+                <div class="dialog dialog_danger">
+                <div class="dialog_container">
+                    <div class="dialog_header">
+                    <h2>¿Deseas eliminar este Consigna fija?</h2>
+                    </div>
 
-                <div class="dialog_message">
-                  <p>Esta acción no se puede revertir</p>
-                </div>
+                    <div class="dialog_message">
+                    <p>Esta acción no se puede revertir</p>
+                    </div>
 
-                <div class="dialog_footer">
-                  <button class="btn btn_primary" id="cancel">Cancelar</button>
-                  <button class="btn btn_danger" id="delete">Eliminar</button>
+                    <div class="dialog_footer">
+                    <button class="btn btn_primary" id="cancel">Cancelar</button>
+                    <button class="btn btn_danger" id="delete">Eliminar</button>
+                    </div>
                 </div>
-              </div>
+                </div>
             </div>
-          </div>
-        `;
-                const deleteButton = document.getElementById('delete');
-                const cancelButton = document.getElementById('cancel');
-                const dialogContent = document.getElementById('dialog-content');
-                deleteButton.onclick = async () => {
-                    deleteEntity('Task_', entityId)
-                        .then((res) => {
-                            setTimeout(async () => {
-                                //let data = await getUsers();
-                                const tableBody = document.getElementById('datatable-body');
-                                new CloseDialog().x(dialogContent);
-                                new Fixed().render(infoPage.offset, infoPage.currentPage, infoPage.search);
-                            }, 1000);
-                        });
-                };
-                cancelButton.onclick = () => {
-                    new CloseDialog().x(dialogContent);
-                    //this.render();
-                };
+            `;
+                    const deleteButton = document.getElementById('delete');
+                    const cancelButton = document.getElementById('cancel');
+                    const dialogContent = document.getElementById('dialog-content');
+                    deleteButton.onclick = async () => {
+                        if(!infoPage.actions.includes("DLT") && !Config.currentUser?.isMaster){
+                            alert("Usuario no tiene permiso de eliminar.");
+                        }else{
+                            deleteEntity('Task_', entityId)
+                                .then((res) => {
+                                    setTimeout(async () => {
+                                        //let data = await getUsers();
+                                        const tableBody = document.getElementById('datatable-body');
+                                        new CloseDialog().x(dialogContent);
+                                        new Fixed().render(infoPage.offset, infoPage.currentPage, infoPage.search);
+                                    }, 1000);
+                                });
+                        }
+                    };
+                    cancelButton.onclick = () => {
+                        new CloseDialog().x(dialogContent);
+                        //this.render();
+                    };
+                }
             });
         });
     }
@@ -747,126 +788,134 @@ export class Fixed {
 
         const exportNotes = document.getElementById('export-entities');
         exportNotes.addEventListener('click', async () => {
-            this.dialogContainer.style.display = 'block';
-            this.dialogContainer.innerHTML = `
-              <div class="dialog_content" id="dialog-content">
-                  <div class="dialog">
-                      <div class="dialog_container padding_8">
-                          <div class="dialog_header">
-                              <h2>Seleccionar la hora</h2>
-                          </div>
+            if(!infoPage.actions.includes("DWN") && !Config.currentUser?.isMaster){
+                alert("Usuario no tiene permiso de exportar.");
+            }else{
+                this.dialogContainer.style.display = 'block';
+                this.dialogContainer.innerHTML = `
+                <div class="dialog_content" id="dialog-content">
+                    <div class="dialog">
+                        <div class="dialog_container padding_8">
+                            <div class="dialog_header">
+                                <h2>Seleccionar la hora</h2>
+                            </div>
 
-                          <div class="dialog_message padding_8">
-                              <div class="form_group">
-                                  <div class="form_input">
-                                      <label class="form_label" for="start-date">Desde:</label>
-                                      <input type="time" class="input_date input_time-start" id="start-time" name="start-time">
-                                  </div>
-                  
-                                  <div class="form_input">
-                                      <label class="form_label" for="end-date">Hasta:</label>
-                                      <input type="time" class="input_date input_time-end" id="end-time" name="end-time">
-                                  </div>
+                            <div class="dialog_message padding_8">
+                                <div class="form_group">
+                                    <div class="form_input">
+                                        <label class="form_label" for="start-date">Desde:</label>
+                                        <input type="time" class="input_date input_time-start" id="start-time" name="start-time">
+                                    </div>
+                    
+                                    <div class="form_input">
+                                        <label class="form_label" for="end-date">Hasta:</label>
+                                        <input type="time" class="input_date input_time-end" id="end-time" name="end-time">
+                                    </div>
 
-                                  <label for="exportCsv">
-                                      <input type="radio" id="exportCsv" name="exportOption" value="csv" /> CSV
-                                  </label>
+                                    <label for="exportCsv">
+                                        <input type="radio" id="exportCsv" name="exportOption" value="csv" /> CSV
+                                    </label>
 
-                                  <label for="exportXls">
-                                      <input type="radio" id="exportXls" name="exportOption" value="xls" checked /> XLS
-                                  </label>
+                                    <label for="exportXls">
+                                        <input type="radio" id="exportXls" name="exportOption" value="xls" checked /> XLS
+                                    </label>
 
-                                  <label for="exportPdf">
-                                      <input type="radio" id="exportPdf" name="exportOption" value="pdf" /> PDF
-                                  </label>
-                              </div>
-                          </div>
+                                    <label for="exportPdf">
+                                        <input type="radio" id="exportPdf" name="exportOption" value="pdf" /> PDF
+                                    </label>
+                                </div>
+                            </div>
 
-                          <div class="dialog_footer">
-                              <button class="btn btn_primary" id="cancel">Cancelar</button>
-                              <button class="btn btn_danger" id="export-data">Exportar</button>
-                          </div>
-                      </div>
-                  </div>
-              </div>
-          `;
-            const fecha = new Date();
+                            <div class="dialog_footer">
+                                <button class="btn btn_primary" id="cancel">Cancelar</button>
+                                <button class="btn btn_danger" id="export-data">Exportar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+                const fecha = new Date();
 
-            const hour = fecha.getHours();
-            const minutes = fecha.getMinutes();
-            const seconds = fecha.getSeconds();
+                const hour = fecha.getHours();
+                const minutes = fecha.getMinutes();
+                const seconds = fecha.getSeconds();
 
-            const hourFormat = `${hour.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+                const hourFormat = `${hour.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
 
-            document.getElementById("start-time").value = "00:00"
-            document.getElementById("end-time").value = hourFormat
-            inputObserver();
-            const _closeButton = document.getElementById('cancel');
-            const exportButton = document.getElementById('export-data');
-            const _dialog = document.getElementById('dialog-content');
-            exportButton.addEventListener('click', async () => {
-                const _values = {
-                    start: document.getElementById('start-time'),
-                    end: document.getElementById('end-time'),
-                    exportOption: document.getElementsByName('exportOption')
-                }
-                let rawExport = JSON.stringify({
-                    "filter": {
-                        "conditions": [
-                            {
-                                "property": "taskType",
-                                "operator": "=",
-                                "value": `FIJAS`
+                document.getElementById("start-time").value = "00:00"
+                document.getElementById("end-time").value = hourFormat
+                inputObserver();
+                const _closeButton = document.getElementById('cancel');
+                const exportButton = document.getElementById('export-data');
+                const _dialog = document.getElementById('dialog-content');
+                exportButton.addEventListener('click', async () => {
+                    if(!infoPage.actions.includes("DWN") && !Config.currentUser?.isMaster){
+                        alert("Usuario no tiene permiso de exportar.");
+                    }else{
+                        const _values = {
+                            start: document.getElementById('start-time'),
+                            end: document.getElementById('end-time'),
+                            exportOption: document.getElementsByName('exportOption')
+                        }
+                        let rawExport = JSON.stringify({
+                            "filter": {
+                                "conditions": [
+                                    {
+                                        "property": "taskType",
+                                        "operator": "=",
+                                        "value": `FIJAS`
+                                    },
+                                    {
+                                        "property": "user.userType",
+                                        "operator": "=",
+                                        "value": `GUARD`
+                                    },
+                                    {
+                                        "property": "customer.id",
+                                        "operator": "=",
+                                        "value": `${customerId}`
+                                    },
+                                    {
+                                        "property": "execTime",
+                                        "operator": ">=",
+                                        "value": `${_values.start.value}`
+                                    },
+                                    {
+                                        "property": "execTime",
+                                        "operator": "<=",
+                                        "value": `${_values.end.value}`
+                                    }
+                                ],
                             },
-                            {
-                                "property": "user.userType",
-                                "operator": "=",
-                                "value": `GUARD`
-                            },
-                            {
-                                "property": "customer.id",
-                                "operator": "=",
-                                "value": `${customerId}`
-                            },
-                            {
-                                "property": "execTime",
-                                "operator": ">=",
-                                "value": `${_values.start.value}`
-                            },
-                            {
-                                "property": "execTime",
-                                "operator": "<=",
-                                "value": `${_values.end.value}`
-                            }
-                        ],
-                    },
-                    sort: "+execTime",
-                    fetchPlan: 'full',
-                });
-                const fixed = await getFilterEntityData("Task_", rawExport);
-                for (let i = 0; i < _values.exportOption.length; i++) {
-                    let ele = _values.exportOption[i];
-                    if (ele.type = "radio") {
-                        if (ele.checked) {
-                            if (ele.value == "xls") {
-                                // @ts-ignore
-                                exportFixedXls(fixed, _values.start.value, _values.end.value);
-                            }
-                            else if (ele.value == "csv") {
-                                // @ts-ignore
-                                exportFixedCsv(fixed, _values.start.value, _values.end.value);
-                            }
-                            else if (ele.value == "pdf") {
-                                // @ts-ignore
-                                exportFixedPdf(fixed, _values.start.value, _values.end.value);
+                            sort: "+execTime",
+                            fetchPlan: 'full',
+                        });
+                        const fixed = await getFilterEntityData("Task_", rawExport);
+                        for (let i = 0; i < _values.exportOption.length; i++) {
+                            let ele = _values.exportOption[i];
+                            if (ele.type = "radio") {
+                                if (ele.checked) {
+                                    if (ele.value == "xls") {
+                                        // @ts-ignore
+                                        exportFixedXls(fixed, _values.start.value, _values.end.value);
+                                    }
+                                    else if (ele.value == "csv") {
+                                        // @ts-ignore
+                                        exportFixedCsv(fixed, _values.start.value, _values.end.value);
+                                    }
+                                    else if (ele.value == "pdf") {
+                                        // @ts-ignore
+                                        exportFixedPdf(fixed, _values.start.value, _values.end.value);
+                                    }
+                                }
                             }
                         }
                     }
-                }
-            });
-            _closeButton.onclick = () => {
-                new CloseDialog().x(_dialog);
-            };
+                });
+                _closeButton.onclick = () => {
+                    new CloseDialog().x(_dialog);
+                };
+            }
         });
     };
     close() {

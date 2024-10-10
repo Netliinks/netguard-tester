@@ -37,9 +37,18 @@ export const UIContentLayout = `
             Usuario <i class="fa-regular fa-filter"></i>
             </span></th>
 
+            <th><span data-type="status">
+            Estado <i class="fa-regular fa-filter"></i>
+            </span></th>
+
             <th class="thead_centered" width=220><span data-type="date">
             Fecha <i class="fa-regular fa-filter"></i>
             </span></th>
+
+            <th><span data-type="obs">
+            Obs <i class="fa-regular fa-filter"></i>
+            </span></th>
+            <th class="header_filled"></th>
             <th class="header_filled"></th>
         </tr></thead>
         <tbody id="datatable-body" class="datatable_body">
@@ -109,6 +118,35 @@ export const UIRightSidebar = `
         <div class="input_detail">
             <label for="creation-time"><i class="fa-solid fa-clock"></i></label>
             <input type="time" id="creation-time" class="input_filled" readonly>
+        </div>
+        <br>
+        <div class="input_detail">
+            <label for="target-status"><i class="fa-solid fa-gear"></i></label>
+            <input type="status" id="target-status" class="input_filled" readonly>
+        </div>
+        <br>
+        <h3>Tiempo Objetivo Desde</h3>
+        <br>
+        <div class="input_detail">
+            <label for="target-date"><i class="fa-solid fa-calendar"></i></label>
+            <input type="date" id="target-date" class="input_filled" readonly>
+        </div>
+        <br>
+        <div class="input_detail">
+            <label for="target-time"><i class="fa-solid fa-clock"></i></label>
+            <input type="time" id="target-time" class="input_filled" readonly>
+        </div>
+        <br>
+        <h3>Tiempo Objetivo Antes de</h3>
+        <br>
+        <div class="input_detail">
+            <label for="target-date2"><i class="fa-solid fa-calendar"></i></label>
+            <input type="date" id="target-date2" class="input_filled" readonly>
+        </div>
+        <br>
+        <div class="input_detail">
+            <label for="target-time2"><i class="fa-solid fa-clock"></i></label>
+            <input type="time" id="target-time2" class="input_filled" readonly>
         </div>
 
     </div>

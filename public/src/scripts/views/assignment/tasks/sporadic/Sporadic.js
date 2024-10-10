@@ -1,6 +1,6 @@
 // @filename: Sporadic.ts
 import { deleteEntity, getEntitiesData,getFilterEntityCount, registerEntity, updateEntity, getEntityData,setFile,getUserInfo,getFile,postNotificationPush,getFilterEntityData } from "../../../../endpoints.js";
-import { inputObserver, inputSelect, CloseDialog, filterDataByHeaderType,fillBtnPagination, searchUniversalSingle, currentDateTime  } from "../../../../tools.js";
+import { inputObserver, inputSelect, CloseDialog, filterDataByHeaderType,fillBtnPagination, searchUniversalSingle, currentDateTime, getPermission } from "../../../../tools.js";
 import { Config } from "../../../../Configs.js";
 import { tableLayout } from "./Layout.js";
 import { tableLayoutTemplate } from "./Template.js";
@@ -12,12 +12,14 @@ let infoPage = {
     count: 0,
     offset: Config.offset,
     currentPage: currentPage,
-    search: ""
+    search: "",
+    msgPermission: "",
+    actions: []
 };
 const currentBusiness = async() => {
-    const currentUser = await getUserInfo();
-    const userid = await getEntityData('User', `${currentUser.attributes.id}`);
-    return userid;
+    //const currentUser = await getUserInfo();
+    //const userid = await getEntityData('User', `${currentUser.attributes.id}`);
+    return Config.currentUser;
 }
 let dataPage;
 let currentUser;
@@ -28,46 +30,10 @@ const getTakSporadic= async () => {
     //const FCustomer = takSporadic.filter((data) => `${data.customer?.id}` === `${customerId}` &&  `${data.taskType}`==='ESPORADICAS' &&  `${data.user.userType}`==='GUARD');
     //return FCustomer;
     currentUser = await currentBusiness();
-    let raw = JSON.stringify({
-        "filter": {
-            "conditions": [
-                {
-                    "property": "customer.id",
-                    "operator": "=",
-                    "value": `${customerId}`
-                },
-                {
-                    "property": "taskType",
-                    "operator": "=",
-                    "value": `ESPORADICAS`
-                },
-                {
-                    "property": "user.userType",
-                    "operator": "=",
-                    "value": `GUARD`
-                }
-            ],
-        },
-        sort: "+execDate",
-        limit: Config.tableRows,
-        offset: infoPage.offset,
-        fetchPlan: 'full',
-    });
-    if (infoPage.search != "") {
-        raw = JSON.stringify({
+    const response = async () => {
+        let raw = JSON.stringify({
             "filter": {
                 "conditions": [
-                    {
-                        "group": "OR",
-                        "conditions": [
-                            {
-                                "property": "name",
-                                "operator": "contains",
-                                "value": `${infoPage.search.toLowerCase()}`
-                            },
-                            
-                        ]
-                    },
                     {
                         "property": "customer.id",
                         "operator": "=",
@@ -83,18 +49,75 @@ const getTakSporadic= async () => {
                         "operator": "=",
                         "value": `GUARD`
                     }
-                ]
+                ],
             },
             sort: "+execDate",
             limit: Config.tableRows,
             offset: infoPage.offset,
             fetchPlan: 'full',
         });
+        if (infoPage.search != "") {
+            raw = JSON.stringify({
+                "filter": {
+                    "conditions": [
+                        {
+                            "group": "OR",
+                            "conditions": [
+                                {
+                                    "property": "name",
+                                    "operator": "contains",
+                                    "value": `${infoPage.search.toLowerCase()}`
+                                },
+                                
+                            ]
+                        },
+                        {
+                            "property": "customer.id",
+                            "operator": "=",
+                            "value": `${customerId}`
+                        },
+                        {
+                            "property": "taskType",
+                            "operator": "=",
+                            "value": `ESPORADICAS`
+                        },
+                        {
+                            "property": "user.userType",
+                            "operator": "=",
+                            "value": `GUARD`
+                        }
+                    ]
+                },
+                sort: "+execDate",
+                limit: Config.tableRows,
+                offset: infoPage.offset,
+                fetchPlan: 'full',
+            });
+        }
+        infoPage.count = await getFilterEntityCount("Task_", raw);
+        dataPage = await getFilterEntityData("Task_", raw);
+        return dataPage;
     }
-    infoPage.count = await getFilterEntityCount("Task_", raw);
-    dataPage = await getFilterEntityData("Task_", raw);
-    return dataPage;
-
+    if(Config.currentUser?.isMaster){
+        return response();
+    }else{
+        const permission = await getPermission('TASK_SPORADIC', Config.currentUser.id);
+        if(permission.code === 3){
+            infoPage.actions = permission.message.actionsText.split(';');
+            if(infoPage.actions.includes("READ")){
+                return response();
+            }else{
+                infoPage.msgPermission = "Usuario no tiene permiso de lectura.";
+                infoPage.count = 0;
+                return [];
+            }
+        }else{
+            infoPage.msgPermission = permission.message;
+            infoPage.count = 0;
+            return [];
+        }
+    
+    }
 };
 export class Sporadic {
     constructor() {
@@ -185,7 +208,7 @@ export class Sporadic {
         let end = start + tableRows;
         let paginatedItems = data.slice(start, end);
         if (data.length === 0) {
-            let mensaje = 'No existen datos';
+            let mensaje = `No existen datos. ${infoPage.msgPermission}`;
             if(customerId == null){mensaje = 'Seleccione una empresa';}
             let row = document.createElement('tr');
             row.innerHTML = `
@@ -294,8 +317,11 @@ export class Sporadic {
       // register entity
       const openEditor = document.getElementById('new-entity');
       openEditor.addEventListener('click', () => {
-          renderInterface();
-          
+        if(infoPage.actions.includes("INS") || Config.currentUser?.isMaster){
+            renderInterface();
+        }else{
+            alert("Usuario no tiene permiso de registrar.");
+        }
       });
       const renderInterface = async () => {
           const notification = await searchUniversalSingle("name", "=", "Consigna", "NotificationType");
@@ -378,98 +404,101 @@ export class Sporadic {
  
           registerButton.addEventListener('click', async(e) => {
               e.preventDefault();
-              const name = document.getElementById('entity-name')
-              
-              const executionDate = document.getElementById('execution-date')
-              const executionTime = document.getElementById('execution-time')
-              const description= document.getElementById('entity-description')
-              const inputsCollection = {
-                name: name,
-                executionDate: executionDate,
-                executionTime: executionTime,
-                description : description
-              
-              };
-              let _userInfo = await getUserInfo();
-              const customerId = localStorage.getItem('customer_id');
-              
-              console.log(inputsCollection.name.value)
-              
-                let dateToday = new Date(dateFormat);
-                let dateExec = new Date(executionDate.value); 
-                let horusInstant = new Date( `${dateFormat}T${hourFormat}`);
-                let horusExec = new Date(`${dateFormat}T${executionTime.value}`);
-               const raw = JSON.stringify({
-                    "taskType": `ESPORADICAS`,
-                    "name": `${inputsCollection.name.value}`,
-                    "description": `${inputsCollection.description.value}`,
-                    "execDate": `${inputsCollection.executionDate.value}`,
-                    "user":  {
-                    "id": `${_userInfo['attributes']['id']}`
-                    },   
-                    "customer": {
-                        "id": `${customerId}`
-                    },
-                    "execTime":`${inputsCollection.executionTime.value}`,
-                    "startTime": `${hourFormat}`,
-                    "startDate": `${dateFormat}`,
-                    
-                });
-              if(name.value.trim() === '' || name.value.trim() === null){
-                alert('Nombre del consigna general vacío')
-              }
-              else if(executionDate.value.trim() === '' || executionDate.value.trim() === null){
-                alert('Debe especificar la fecha de la consigna')
-              }
-              else if(dateToday > dateExec){
-                alert('La fecha no puede ser menor a la del día de hoy')
-              }
-
-              else if(executionTime.value.trim() === '' || executionTime.value.trim() === null){
-                alert('Debe especificar la hora de ejecución de la consigna')
-              }
-              //COMPARANDO LAS HORAS DEL MISMO DIA
-              else if(dateToday.getTime() == dateExec.getTime() && (horusInstant > horusExec)){
-                alert('La hora no puede ser menor a la actual')
+              if(!infoPage.actions.includes("INS") && !Config.currentUser?.isMaster){
+                alert("Usuario no tiene permiso de registrar.");
+              }else{
+                const name = document.getElementById('entity-name')
                 
-              }
-              else{
-                reg(raw);
-                let rawUser = JSON.stringify({
-                    "filter": {
-                        "conditions": [
-                            {
-                                "property": "customer.id",
-                                "operator": "=",
-                                "value": `${customerId}`
-                            },
-                            {
-                                "property": "userType",
-                                "operator": "=",
-                                "value": `GUARD`
-                            },
-                            {
-                                "property": "state.name",
-                                "operator": "=",
-                                "value": `Enabled`
-                            },
-                            {
-                                "property": "token",
-                                "operator": "<>",
-                                "value": ``
-                            }
-                        ],
-                    },
-                });
-                const dataUser= await getFilterEntityData("User", rawUser);                           
-                for(let i =0; i<dataUser.length;i++){
-                    
-                    const data = {"token":dataUser[i]['token'],"title": "Específica", "body":`${inputsCollection.name.value}`  }
-                    const envioPush = await postNotificationPush(data);
+                const executionDate = document.getElementById('execution-date')
+                const executionTime = document.getElementById('execution-time')
+                const description= document.getElementById('entity-description')
+                const inputsCollection = {
+                    name: name,
+                    executionDate: executionDate,
+                    executionTime: executionTime,
+                    description : description
+                
+                };
+                //let _userInfo = await getUserInfo();
+                const customerId = localStorage.getItem('customer_id');
+                
+                console.log(inputsCollection.name.value)
+                
+                    let dateToday = new Date(dateFormat);
+                    let dateExec = new Date(executionDate.value); 
+                    let horusInstant = new Date( `${dateFormat}T${hourFormat}`);
+                    let horusExec = new Date(`${dateFormat}T${executionTime.value}`);
+                const raw = JSON.stringify({
+                        "taskType": `ESPORADICAS`,
+                        "name": `${inputsCollection.name.value}`,
+                        "description": `${inputsCollection.description.value}`,
+                        "execDate": `${inputsCollection.executionDate.value}`,
+                        "user":  {
+                        "id": `${Config.currentUser.id}` //`${_userInfo['attributes']['id']}`
+                        },   
+                        "customer": {
+                            "id": `${customerId}`
+                        },
+                        "execTime":`${inputsCollection.executionTime.value}`,
+                        "startTime": `${hourFormat}`,
+                        "startDate": `${dateFormat}`,
+                        
+                    });
+                if(name.value.trim() === '' || name.value.trim() === null){
+                    alert('Nombre del consigna general vacío')
                 }
-               
-            } 
+                else if(executionDate.value.trim() === '' || executionDate.value.trim() === null){
+                    alert('Debe especificar la fecha de la consigna')
+                }
+                else if(dateToday > dateExec){
+                    alert('La fecha no puede ser menor a la del día de hoy')
+                }
 
+                else if(executionTime.value.trim() === '' || executionTime.value.trim() === null){
+                    alert('Debe especificar la hora de ejecución de la consigna')
+                }
+                //COMPARANDO LAS HORAS DEL MISMO DIA
+                else if(dateToday.getTime() == dateExec.getTime() && (horusInstant > horusExec)){
+                    alert('La hora no puede ser menor a la actual')
+                    
+                }
+                else{
+                    reg(raw);
+                    let rawUser = JSON.stringify({
+                        "filter": {
+                            "conditions": [
+                                {
+                                    "property": "customer.id",
+                                    "operator": "=",
+                                    "value": `${customerId}`
+                                },
+                                {
+                                    "property": "userType",
+                                    "operator": "=",
+                                    "value": `GUARD`
+                                },
+                                {
+                                    "property": "state.name",
+                                    "operator": "=",
+                                    "value": `Enabled`
+                                },
+                                {
+                                    "property": "token",
+                                    "operator": "<>",
+                                    "value": ``
+                                }
+                            ],
+                        },
+                    });
+                    const dataUser= await getFilterEntityData("User", rawUser);                           
+                    for(let i =0; i<dataUser.length;i++){
+                        
+                        const data = {"token":dataUser[i]['token'],"title": "Específica", "body":`${inputsCollection.name.value}`  }
+                        const envioPush = await postNotificationPush(data);
+                    }
+                
+                } 
+            }
              
         });
       
@@ -633,7 +662,9 @@ export class Sporadic {
             //console.log(hourFormat)
             //console.log(executionTime.value)
              
-            if(name.value.trim() === '' || name.value.trim() === null){
+            if(!infoPage.actions.includes("UPD") && !Config.currentUser?.isMaster){
+                alert("Usuario no tiene permiso de actualizar.");
+            }else if(name.value.trim() === '' || name.value.trim() === null){
               alert('Nombre del consigna general vacío')
             }
             else if(executionDate.value.trim() === '' || executionDate.value.trim() === null){
@@ -752,48 +783,56 @@ export class Sporadic {
         remove.forEach((remove) => {
             const entityId = remove.dataset.entityid;
             remove.addEventListener('click', () => {
-                this.dialogContainer.style.display = 'flex';
-                this.dialogContainer.innerHTML = `
-          <div class="dialog_content" id="dialog-content">
-            <div class="dialog dialog_danger">
-              <div class="dialog_container">
-                <div class="dialog_header">
-                  <h2>¿Deseas eliminar este Consigna Específica?</h2>
-                </div>
+                if(!infoPage.actions.includes("DLT") && !Config.currentUser?.isMaster){
+                    alert("Usuario no tiene permiso de eliminar.");
+                }else{
+                    this.dialogContainer.style.display = 'flex';
+                    this.dialogContainer.innerHTML = `
+            <div class="dialog_content" id="dialog-content">
+                <div class="dialog dialog_danger">
+                <div class="dialog_container">
+                    <div class="dialog_header">
+                    <h2>¿Deseas eliminar este Consigna Específica?</h2>
+                    </div>
 
-                <div class="dialog_message">
-                  <p>Esta acción no se puede revertir</p>
-                </div>
+                    <div class="dialog_message">
+                    <p>Esta acción no se puede revertir</p>
+                    </div>
 
-                <div class="dialog_footer">
-                  <button class="btn btn_primary" id="cancel">Cancelar</button>
-                  <button class="btn btn_danger" id="delete">Eliminar</button>
+                    <div class="dialog_footer">
+                    <button class="btn btn_primary" id="cancel">Cancelar</button>
+                    <button class="btn btn_danger" id="delete">Eliminar</button>
+                    </div>
                 </div>
-              </div>
+                </div>
             </div>
-          </div>
-        `;
-                // delete button
-                // cancel button
-                // dialog content
-                const deleteButton = document.getElementById('delete');
-                const cancelButton = document.getElementById('cancel');
-                const dialogContent = document.getElementById('dialog-content');
-                deleteButton.onclick = async() => {
-                    deleteEntity('Task_', entityId)
-                    .then((res) => {
-                        setTimeout(async () => {
-                            //let data = await getUsers();
-                            const tableBody = document.getElementById('datatable-body');
-                            new CloseDialog().x(dialogContent);
-                            new Sporadic().render(infoPage.offset, infoPage.currentPage, infoPage.search);
-                        }, 1000);
-                    });
-                };
-                cancelButton.onclick = () => {
-                    new CloseDialog().x(dialogContent);
-                    //this.render();
-                };
+            `;
+                    // delete button
+                    // cancel button
+                    // dialog content
+                    const deleteButton = document.getElementById('delete');
+                    const cancelButton = document.getElementById('cancel');
+                    const dialogContent = document.getElementById('dialog-content');
+                    deleteButton.onclick = async() => {
+                        if(!infoPage.actions.includes("DLT") && !Config.currentUser?.isMaster){
+                            alert("Usuario no tiene permiso de eliminar.");
+                        }else{
+                            deleteEntity('Task_', entityId)
+                            .then((res) => {
+                                setTimeout(async () => {
+                                    //let data = await getUsers();
+                                    const tableBody = document.getElementById('datatable-body');
+                                    new CloseDialog().x(dialogContent);
+                                    new Sporadic().render(infoPage.offset, infoPage.currentPage, infoPage.search);
+                                }, 1000);
+                            });
+                        }
+                    };
+                    cancelButton.onclick = () => {
+                        new CloseDialog().x(dialogContent);
+                        //this.render();
+                    };
+                }
             });
         });
     }
@@ -808,6 +847,9 @@ export class Sporadic {
     export = () => {
       const exportNotes = document.getElementById('export-entities');
       exportNotes.addEventListener('click', async() => {
+        if(!infoPage.actions.includes("DWN") && !Config.currentUser?.isMaster){
+            alert("Usuario no tiene permiso de exportar.");
+        }else{
           this.dialogContainer.style.display = 'block';
           this.dialogContainer.innerHTML = `
               <div class="dialog_content" id="dialog-content">
@@ -867,6 +909,9 @@ export class Sporadic {
           const exportButton = document.getElementById('export-data');
           const _dialog = document.getElementById('dialog-content');
           exportButton.addEventListener('click', async() => {
+            if(!infoPage.actions.includes("DWN") && !Config.currentUser?.isMaster){
+                alert("Usuario no tiene permiso de exportar.");
+            }else{
               const _values = {
                   start: document.getElementById('start-date'),
                   end: document.getElementById('end-date'),
@@ -925,10 +970,12 @@ export class Sporadic {
                       }
                   }
               }
+            }
           });
           _closeButton.onclick = () => {
               new CloseDialog().x(_dialog);
           };
+        }
       });
   };
 }

@@ -1,6 +1,6 @@
 // @filename: Customers.ts
 import { registerEntity, getUserInfo, getEntityData, updateEntity, getFilterEntityData, getFilterEntityCount } from "../../endpoints.js";
-import { drawTagsIntoTables, inputObserver, inputSelect, CloseDialog, filterDataByHeaderType, pageNumbers, fillBtnPagination } from "../../tools.js";
+import { drawTagsIntoTables, inputObserver, inputSelect, CloseDialog, filterDataByHeaderType, pageNumbers, fillBtnPagination, getPermission } from "../../tools.js";
 import { Config } from "../../Configs.js";
 import { tableLayout, UIContact } from "./Layout.js";
 import { tableLayoutTemplate } from "./Template.js";
@@ -10,7 +10,9 @@ let infoPage = {
   count: 0,
   offset: Config.offset,
   currentPage: currentPage,
-  search: ""
+  search: "",
+  msgPermission: "",
+  actions: []
 };
 const currentBusiness = async() => {
   const currentUser = await getUserInfo();
@@ -20,55 +22,77 @@ const currentBusiness = async() => {
 
 const getCustomers = async () => {
     const currentUser = await currentBusiness();
-    let raw = JSON.stringify({
-      "filter": {
-          "conditions": [
-              {
-                  "property": "business.id",
-                  "operator": "=",
-                  "value": `${currentUser.business.id}`
-              }
-          ],
-      },
-      sort: "-createdDate",
-      limit: Config.tableRows,
-      offset: infoPage.offset,
-      fetchPlan: 'full',
-  });
-  if (infoPage.search != "") {
-    raw = JSON.stringify({
+    const response = async () => {
+      let raw = JSON.stringify({
         "filter": {
             "conditions": [
                 {
-                    "group": "OR",
-                    "conditions": [
-                        {
-                            "property": "name",
-                            "operator": "contains",
-                            "value": `${infoPage.search.toLowerCase()}`
-                        },
-                        {
-                            "property": "ruc",
-                            "operator": "contains",
-                            "value": `${infoPage.search.toLowerCase()}`
-                        }
-                    ]
-                },
-                {
-                  "property": "business.id",
-                  "operator": "=",
-                  "value": `${currentUser.business.id}`
+                    "property": "business.id",
+                    "operator": "=",
+                    "value": `${currentUser.business.id}`
                 }
-            ]
+            ],
         },
         sort: "-createdDate",
         limit: Config.tableRows,
         offset: infoPage.offset,
         fetchPlan: 'full',
-    });
-}
-  infoPage.count = await getFilterEntityCount("Customer", raw);
-  return await getFilterEntityData("Customer", raw);
+      });
+      if (infoPage.search != "") {
+        raw = JSON.stringify({
+            "filter": {
+                "conditions": [
+                    {
+                        "group": "OR",
+                        "conditions": [
+                            {
+                                "property": "name",
+                                "operator": "contains",
+                                "value": `${infoPage.search.toLowerCase()}`
+                            },
+                            {
+                                "property": "ruc",
+                                "operator": "contains",
+                                "value": `${infoPage.search.toLowerCase()}`
+                            }
+                        ]
+                    },
+                    {
+                      "property": "business.id",
+                      "operator": "=",
+                      "value": `${currentUser.business.id}`
+                    }
+                ]
+            },
+            sort: "-createdDate",
+            limit: Config.tableRows,
+            offset: infoPage.offset,
+            fetchPlan: 'full',
+        });
+    }
+    infoPage.count = await getFilterEntityCount("Customer", raw);
+    return await getFilterEntityData("Customer", raw);
+  }
+  if(currentUser?.isMaster){
+    return response();
+  }else{
+      const permission = await getPermission('CUSTOMER', currentUser.id);
+      if(permission.code === 3){
+          infoPage.actions = permission.message.actionsText.split(';');
+          if(infoPage.actions.includes("READ")){
+            return response();
+          }else{
+            infoPage.msgPermission = "Usuario no tiene permiso de lectura.";
+            infoPage.count = 0;
+            return [];
+          }
+      }else{
+          infoPage.msgPermission = permission.message;
+          infoPage.count = 0;
+          return [];
+      }
+      
+  }
 };
 export class Customers {
     constructor() {
@@ -120,7 +144,7 @@ export class Customers {
         if (data.length === 0) {
             let row = document.createElement('tr');
             row.innerHTML = `
-        <td>No existen datos</td>
+        <td>No existen datos. ${infoPage.msgPermission}</td>
         <td></td>
         <td></td>
       `;
@@ -131,9 +155,12 @@ export class Customers {
                 let customer = paginatedItems[i];
                 let row = document.createElement('tr');
                 row.innerHTML += `
-          <td>${customer.name}</dt>
-          <td>${customer.ruc}</dt>
-          <td class="tag"><span>${customer.state.name}</span></td>
+          <td>${customer?.name ?? ''}</dt>
+          <td>${customer?.ruc ?? ''}</dt>
+          <td class="tag"><span>${customer?.state?.name ?? ''}</span></td>
+          <td>${customer?.permitMarcation ? 'Si' : 'No'}</td>
+          <td>${customer?.permitVehicular ? 'Si' : 'No'}</td>
+          <td>${customer?.permitRoutine ? 'Si' : 'No'}</td>
           <td class="entity_options">
               <button class="button" id="edit-entity" data-entityId="${customer.id}">
                 <i class="fa-solid fa-pen"></i>
@@ -216,7 +243,11 @@ export class Customers {
         // register entity
         const openEditor = document.getElementById('new-entity');
         openEditor.addEventListener('click', () => {
+          if(infoPage.actions.includes("INS") || Config.currentUser?.isMaster){
             renderInterface();
+          }else{
+            alert("Usuario no tiene permiso de registrar.");
+          }
         });
         const renderInterface = async () => {
             this.entityDialogContainer.innerHTML = '';
@@ -301,12 +332,18 @@ export class Customers {
                     "permitVehicular": `${inputsCollection.vehicular.checked ? true : false}`,
                     "permitRoutine": `${inputsCollection.routine.checked ? true : false}`,
                 });
-                registerEntity(raw, 'Customer');
-                setTimeout(() => {
-                    const container = document.getElementById('entity-editor-container');
-                    new CloseDialog().x(container);
-                    new Customers().render(Config.offset, Config.currentPage, infoPage.search);
-                }, 1000);
+                if(!infoPage.actions.includes("INS") && !Config.currentUser?.isMaster){
+                  alert("Usuario no tiene permiso de registrar.");
+                }else if(inputsCollection.name.value == '' || inputsCollection.name.value == null || inputsCollection.name.value == undefined){
+                  alert("Debe completar el nombre");
+                }else{
+                  registerEntity(raw, 'Customer');
+                  setTimeout(() => {
+                      const container = document.getElementById('entity-editor-container');
+                      new CloseDialog().x(container);
+                      new Customers().render(Config.offset, Config.currentPage, infoPage.search);
+                  }, 1000);
+                }
             });
         };
         const reg = async (raw) => {
@@ -418,7 +455,11 @@ export class Customers {
                   "permitVehicular": `${$value.vehicular.checked ? true : false}`,
                   "permitRoutine": `${$value.routine.checked ? true : false}`,
               });
-              update(raw);
+              if(!infoPage.actions.includes("UPD") && !Config.currentUser?.isMaster){
+                alert("Usuario no tiene permiso de actualizar.");
+              }else{
+                update(raw);
+              }
             });
             const update = (raw) => {
               updateEntity('Customer', entityId, raw)
@@ -465,42 +506,46 @@ export class Customers {
                             "name": `${_contactName.value}`,
                             "phone": `${_contactPhone.value}`
                         });
-                        await registerEntity(raw, 'Contact')
-                            .then(() => {
-                            setTimeout(async () => {
-                              let rawSearch = JSON.stringify({
-                                "filter": {
-                                    "conditions": [
-                                        {
-                                            "property": "name",
-                                            "operator": "=",
-                                            "value": `${_contactName.value}`
-                                        },
-                                        {
-                                            "property": "phone",
-                                            "operator": "=",
-                                            "value": `${_contactPhone.value}`
-                                        }
-                                    ]
-                                }
-                              });
-                              let contactData = await getFilterEntityData("Contact", rawSearch);
-                              console.log(contactData);
-                              contactData.forEach(async (newContact) => {
-                                let rawCustomer = JSON.stringify({
-                                  "contact": {
-                                      "id": `${newContact.id}`
-                                  },
+                        if(!infoPage.actions.includes("UPD") && !Config.currentUser?.isMaster){
+                          alert("Usuario no tiene permiso de actualizar.");
+                        }else{
+                          await registerEntity(raw, 'Contact')
+                              .then(() => {
+                              setTimeout(async () => {
+                                let rawSearch = JSON.stringify({
+                                  "filter": {
+                                      "conditions": [
+                                          {
+                                              "property": "name",
+                                              "operator": "=",
+                                              "value": `${_contactName.value}`
+                                          },
+                                          {
+                                              "property": "phone",
+                                              "operator": "=",
+                                              "value": `${_contactPhone.value}`
+                                          }
+                                      ]
+                                  }
                                 });
-                                await updateEntity('Customer', entityId, rawCustomer)
-                                    .then(() => {
-                                    setTimeout(() => {
-                                        new CloseDialog().x(_dialog);
-                                    }, 1000);
+                                let contactData = await getFilterEntityData("Contact", rawSearch);
+                                console.log(contactData);
+                                contactData.forEach(async (newContact) => {
+                                  let rawCustomer = JSON.stringify({
+                                    "contact": {
+                                        "id": `${newContact.id}`
+                                    },
+                                  });
+                                  await updateEntity('Customer', entityId, rawCustomer)
+                                      .then(() => {
+                                      setTimeout(() => {
+                                          new CloseDialog().x(_dialog);
+                                      }, 1000);
+                                  });
                                 });
-                              });
-                            }, 1000);
-                        });
+                              }, 1000);
+                          });
+                        }
 
                     }
                     else {
@@ -508,12 +553,16 @@ export class Customers {
                         "name": `${_contactName.value}`,
                         "phone": `${_contactPhone.value}`
                       });
-                      await updateEntity('Contact', data.contact.id, raw)
-                          .then(() => {
-                          setTimeout(() => {
-                              new CloseDialog().x(_dialog);
-                          }, 1000);
-                      });
+                      if(!infoPage.actions.includes("UPD") && !Config.currentUser?.isMaster){
+                        alert("Usuario no tiene permiso de actualizar.");
+                      }else{
+                        await updateEntity('Contact', data.contact.id, raw)
+                            .then(() => {
+                            setTimeout(() => {
+                                new CloseDialog().x(_dialog);
+                            }, 1000);
+                        });
+                      }
                     }
                 });
                 _closeButton.onclick = () => {

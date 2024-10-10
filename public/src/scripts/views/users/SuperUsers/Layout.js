@@ -53,6 +53,10 @@ export const tableLayout = `
           Verif. <i class="fa-regular fa-filter"></i>
         </span></th>
 
+        <th class="thead_centered"><span data-type="master">
+          Master <i class="fa-regular fa-filter"></i>
+        </span></th>
+
         <th class="header_filled"></th>
 
       </tr></thead>
