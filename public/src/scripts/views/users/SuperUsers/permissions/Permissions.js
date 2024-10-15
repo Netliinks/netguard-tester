@@ -206,6 +206,9 @@ export class UserPermissions {
                 case 'DWN':
                     actionNames.push("EXPORTAR");
                     break;
+                case 'CHANGE':
+                    actionNames.push("CAMBIAR");
+                    break;
             
                 default:
                     actionNames.push(arrayActions[i]);
@@ -338,6 +341,11 @@ export class UserPermissions {
                                         id="btnSearchModal">
                                         <i class="fa-solid fa-search"></i>
                                     </button>
+                                    <button
+                                        class="datatable_button add_user"
+                                        id="applyAll">
+                                        Aplicar a todos
+                                    </button>
                                 </div>
                                 <div class="dashboard_datatable">
                                     <table class="datatable_content margin_t_16">
@@ -390,21 +398,15 @@ export class UserPermissions {
                   let td = document.getElementById(`actionsMenu${i}`);
                   if(moduleData?.name === 'CUSTOMER_CHANGE'){
                     td.innerHTML = `
-                        <input type="checkbox" id="entity-check-change" data-entityId="${moduleData.id}">
-                        <label for="entity-check-change"> Cambiar Empresa</label>
+                        <label> <input type="checkbox" id="entity-check-change" data-entityId="${moduleData.id}"> Cambiar Empresa</label>
                     `;
                   }else{
                     td.innerHTML = `
-                        <input type="checkbox" id="entity-check-register" data-entityId="${moduleData.id}">
-                        <label for="entity-check-register"> Registrar</label>
-                        <input type="checkbox" id="entity-check-update" data-entityId="${moduleData.id}">
-                        <label for="entity-check-update"> Editar</label>
-                        <input type="checkbox" id="entity-check-read" data-entityId="${moduleData.id}">
-                        <label for="entity-check-read"> Leer</label>
-                        <input type="checkbox" id="entity-check-delete" data-entityId="${moduleData.id}">
-                        <label for="entity-check-delete"> Eliminar</label>
-                        <input type="checkbox" id="entity-check-export" data-entityId="${moduleData.id}">
-                        <label for="entity-check-export"> Exportar</label>
+                        <label><input type="checkbox" id="entity-check-register" data-entityId="${moduleData.id}"> Registrar</label>
+                        <label><input type="checkbox" id="entity-check-update" data-entityId="${moduleData.id}"> Editar</label>
+                        <label><input type="checkbox" id="entity-check-read" data-entityId="${moduleData.id}"> Leer</label>
+                        <label><input type="checkbox" id="entity-check-delete" data-entityId="${moduleData.id}"> Eliminar</label>
+                        <label><input type="checkbox" id="entity-check-export" data-entityId="${moduleData.id}"> Exportar</label>
                         `;
                   }
               }
@@ -420,6 +422,7 @@ export class UserPermissions {
           const _closeButton = document.getElementById('cancel');
           const _saveButton = document.getElementById('saveModal');
           const _dialog = document.getElementById('dialog-content');
+          const optionAll = document.getElementById('applyAll');
           const prevModalButton = document.getElementById('prevModal');
           const nextModalButton = document.getElementById('nextModal');
           const businessData = await currentBusiness();
@@ -685,6 +688,255 @@ export class UserPermissions {
                 modalTable(offset, search);
             }
           };
+          optionAll.onclick = () => {
+            new CloseDialog().x(_dialog);
+            modalTable2(permisos);
+          };
+      }
+
+
+
+      async function modalTable2(permisos) {
+        const dialogContainer = document.getElementById('app-dialogs');
+        dialogContainer.style.display = 'block';
+        dialogContainer.innerHTML = `
+              <div class="dialog_content" id="dialog-content">
+                  <div class="dialog">
+                      <div class="dialog_container padding_8">
+                          <div class="dialog_header">
+                              <h2>Aplicar a todos los módulos</h2>
+                          </div>
+
+                          <div class="dialog_message padding_8">
+                              <div class="dashboard_datatable">
+                                  <table class="datatable_content margin_t_16">
+                                  <thead>
+                                      <tr>
+                                      <th>Nombre</th>
+                                      <th>Acciones</th>
+                                      </tr>
+                                  </thead>
+                                  <tbody id="datatable-modal-body">
+                                  </tbody>
+                                  </table>
+                              </div>
+                              <br>
+                          </div>
+
+                          <div class="dialog_footer">
+                              <button class="btn btn_danger" id="cancel">Cancelar</button>
+                              <button class="btn btn_primary" id="saveModal">Guardar</button>
+                          </div>
+                      </div>
+                  </div>
+              </div>
+          `;
+        inputObserver();
+        const datetableBody = document.getElementById('datatable-modal-body');
+        const modulos = await getEntitiesData('Module_');
+        if (modulos.length === 0) {
+            let row = document.createElement('tr');
+            row.innerHTML = `
+                  <td>No hay datos</td>
+                  <td></td>
+              `;
+            datetableBody.appendChild(row);
+        }
+        else {
+            let row = document.createElement('tr');
+            row.innerHTML = `
+                <td>Todos los módulos</td>
+                <td>
+                    <label><input type="checkbox" id="entity-check-register"> Registrar</label>
+                    <label><input type="checkbox" id="entity-check-update"> Editar</label>
+                    <label><input type="checkbox" id="entity-check-read"> Leer</label>
+                    <label><input type="checkbox" id="entity-check-delete"> Eliminar</label>
+                    <label><input type="checkbox" id="entity-check-export"> Exportar</label>
+                </td>
+              `;
+            datetableBody.appendChild(row);
+        }
+        
+        const _closeButton = document.getElementById('cancel');
+        const _saveButton = document.getElementById('saveModal');
+        const _dialog = document.getElementById('dialog-content');
+        const businessData = await currentBusiness();
+        let itemsIns = [];
+        let itemsUpd = [];
+        let itemsRead = [];
+        let itemsDlt = [];
+        let itemsDwn = [];
+        //let itemsChange = [];
+        if(permisos.code === 3){
+          for(let i=0;i<permisos.message.length;i++){
+              let acciones = permisos.message[i].actionsText.split(';');
+              if(acciones.includes("INS")){
+                  itemsIns.push(permisos.message[i].module.id);
+              }
+
+              if(acciones.includes("UPD")){
+                  itemsUpd.push(permisos.message[i].module.id);
+              }
+
+              if(acciones.includes("READ")){
+                  itemsRead.push(permisos.message[i].module.id);
+              }
+
+              if(acciones.includes("DLT")){
+                  itemsDlt.push(permisos.message[i].module.id);
+              }
+
+              if(acciones.includes("DWN")){
+                  itemsDwn.push(permisos.message[i].module.id);
+              }
+
+              /*if(acciones.includes("CHANGE")){
+                  itemsChange.push(permisos.message[i].module.id);
+              }*/
+          }
+        }else{
+              alert(permisos.message);
+        }
+        _closeButton.onclick = () => {
+            new CloseDialog().x(_dialog);
+        };
+        _saveButton.onclick = () => {
+          pressed = true;
+          let okIns = true;
+          let okUpd = true;
+          const _checkRegisters = document.getElementById('entity-check-register');
+          const _checkUpdates = document.getElementById('entity-check-update');
+          const _checkReads = document.getElementById('entity-check-read');
+          const _checkDeletes = document.getElementById('entity-check-delete');
+          const _checkExports = document.getElementById('entity-check-export');
+          //const _checkChanges = document.getElementById('entity-check-change');
+          if(pressed){
+              if(!infoPage.actions.includes("INS") && !Config.currentUser?.isMaster){
+                  okIns = false;
+              }
+              if(!infoPage.actions.includes("UPD") && !Config.currentUser?.isMaster){
+                  okUpd = false;
+              }
+
+              if(!okIns && !okUpd){
+                  alert("Usuario no tiene permiso de registrar o editar.");
+              }else{
+                  let newRegisters = {};
+                  for(let i=0; i<modulos.length; i++){
+                    let modulo = modulos[i];
+                    if(modulo.name !== 'CUSTOMER_CHANGE'){
+                        if(_checkRegisters.checked && !itemsIns.includes(modulo.id)){
+                            if (newRegisters[modulo.id]) {
+                                newRegisters[modulo.id].push({acc:'INS'});
+                            } else {
+                                newRegisters[modulo.id] = [{acc:'INS'}];
+                            }
+                        }
+    
+                        if(_checkUpdates.checked && !itemsUpd.includes(modulo.id)){
+                            if (newRegisters[modulo.id]) {
+                                newRegisters[modulo.id].push({acc:'UPD'});
+                            } else {
+                                newRegisters[modulo.id] = [{acc:'UPD'}];
+                            }
+                        }
+    
+                        if(_checkReads.checked && !itemsRead.includes(modulo.id)){
+                            if (newRegisters[modulo.id]) {
+                                newRegisters[modulo.id].push({acc:'READ'});
+                            } else {
+                                newRegisters[modulo.id] = [{acc:'READ'}];
+                            }
+                        }
+    
+                        if(_checkDeletes.checked && !itemsDlt.includes(modulo.id)){
+                            if (newRegisters[modulo.id]) {
+                                newRegisters[modulo.id].push({acc:'DLT'});
+                            } else {
+                                newRegisters[modulo.id] = [{acc:'DLT'}];
+                            }
+                        }
+    
+                        if(_checkExports.checked && !itemsDwn.includes(modulo.id)){
+                            if (newRegisters[modulo.id]) {
+                                newRegisters[modulo.id].push({acc:'DWN'});
+                            } else {
+                                newRegisters[modulo.id] = [{acc:'DWN'}];
+                            }
+                        }
+    
+                        /*if(_checkChanges.checked && !itemsChange.includes(modulo.id)){
+                            if (newRegisters[modulo.id]) {
+                                newRegisters[modulo.id].push({acc:'CHANGE'});
+                            } else {
+                                newRegisters[modulo.id] = [{acc:'CHANGE'}];
+                            }
+                        }*/
+                    }
+                  }
+
+                  let key = Object.keys(newRegisters)
+                  for(let i = 0; i < key.length; i++){
+                      let objects = newRegisters[key[i]]
+                      let listActions = [];
+                      //console.log(key[i])
+                      //console.log(objects)
+                      //console.log(objects.length)
+
+                      objects.map(element => {
+                          listActions.push(element.acc);
+                      });
+
+                      listActions = listActions.toString().replaceAll(",",";");
+                      let checkModule = permisos.message.filter((data) => `${data?.module?.id}` === `${key[i]}`);
+                      if(checkModule.length !== 0){
+                          //Si esta se actualiza
+                          if(okUpd){
+                              let updateActions = checkModule[0]?.actionsText ?? '';
+                              updateActions = updateActions !== '' ? `${updateActions};${listActions}` : `${listActions}`;
+                              let raw = JSON.stringify({ 
+                                  'actionsText': `${updateActions}`,
+                              });
+                              updateEntity('Permission', checkModule[0].id, raw);
+                          }
+                      }else if(checkModule.length === 0){
+                          //si no esta se crea
+                          if(okIns){
+                              let raw = JSON.stringify({ 
+                                  "business": {
+                                      "id": `${businessData.business.id}`
+                                  },                 
+                                  "customer": {
+                                      "id": `${customerId}`
+                                  },
+                                  "user": {
+                                      "id": `${user.id}`
+                                  },
+                                  "module": {
+                                      "id": `${key[i]}`
+                                  },
+                                  'actionsText': `${listActions}`,
+                                  'creationDate': `${currentDateTime().date}`,
+                                  'creationTime': `${currentDateTime().timeHHMMSS}`,
+                              });
+                              registerEntity(raw, 'Permission');
+                          }
+                      }
+                  }
+                  if(!okIns)
+                      alert("Usuario no tiene permiso para registrar.");
+
+                  if(!okUpd)
+                      alert("Usuario no tiene permiso para editar.");
+
+                  setTimeout(() => {
+                      new CloseDialog().x(_dialog);
+                      new UserPermissions().render(Config.offset, Config.currentPage, infoPage.search, user.id, infoPage.actions);
+                  }, 1000);
+              }
+          }
+        };
+
       }
 
     }

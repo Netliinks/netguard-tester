@@ -683,6 +683,11 @@ export const getPermission =async(module, user)=> {
                     "value": `${module}`
                 },
                 {
+                    "property": "user.state.name",
+                    "operator": "=",
+                    "value": `Enabled`
+                },
+                {
                     "property": "user.id",
                     "operator": "=",
                     "value": `${user}`
@@ -744,12 +749,12 @@ export const getPermissions =async(user)=> {
             code: 1,
             message: "No se pudo obtener el permiso"
         };
-    }else if(permission.length === 0){
+    }/*else if(permission.length === 0){
         return {
             code: 2,
             message: "Usuario no tiene el permiso o módulo inactivo"
         };
-    }else if(permission.length !== 0){
+    }*/else if(permission.length !== 0 || permission.length === 0){
         return {
             code: 3,
             message: permission
